@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>WobblyLifeHeadTracking</AssemblyName>
+    <RootNamespace>WobblyLifeHeadTracking</RootNamespace>
+    <Version>0.0.0</Version>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <OutputType>Library</OutputType>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <Authors>CameraUnlock Mods</Authors>
+    <Description>Head tracking mod for Wobbly Life using CameraUnlock.Core</Description>
+    <Copyright>Copyright (c) 2026 itsloopyo</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <!-- CameraUnlock shared library -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\cameraunlock-core\csharp\src\CameraUnlock.Core\CameraUnlock.Core.csproj" />
+    <ProjectReference Include="..\..\cameraunlock-core\csharp\src\CameraUnlock.Core.Unity\CameraUnlock.Core.Unity.csproj">
+      <AdditionalProperties>UnityEnginePath=$(UnityEnginePath)</AdditionalProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Reference DLLs from lib/ folder (populated by setup-libs.ps1, overridable via -p:UnityEnginePath=) -->
+  <PropertyGroup>
+    <UnityEnginePath Condition="'$(UnityEnginePath)' == ''">$(MSBuildProjectDirectory)\libs</UnityEnginePath>
+    <LibPath>$(UnityEnginePath)</LibPath>
+  </PropertyGroup>
+
+  <!-- BepInEx references -->
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(LibPath)\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(LibPath)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Unity references -->
+  <ItemGroup>
+    <Reference Include="UnityEngine">
+      <HintPath>$(LibPath)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(LibPath)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(LibPath)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(LibPath)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="libs\**" />
+    <None Remove="libs\**" />
+  </ItemGroup>
+</Project>

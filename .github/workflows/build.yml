@@ -1,0 +1,248 @@
+name: Build
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+
+jobs:
+  build:
+    name: Build and Validate
+    runs-on: windows-latest
+    if: ${{ !startsWith(github.event.head_commit.message, 'Release v') }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Download BepInEx
+        shell: pwsh
+        run: |
+          Write-Host "Downloading BepInEx 5.4.23.4..." -ForegroundColor Cyan
+
+          $bepinexUrl = "https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.4/BepInEx_win_x64_5.4.23.4.zip"
+          $expectedHash = "F881201B79DA03E513BF97CDF39607FFA7F9E0D31A519B1AEECA8EB60F8309E7"
+
+          Invoke-WebRequest -Uri $bepinexUrl -OutFile bepinex.zip
+
+          $actualHash = (Get-FileHash -Path bepinex.zip -Algorithm SHA256).Hash
+          if ($actualHash -ne $expectedHash) {
+            Write-Host "::error::BepInEx hash mismatch!"
+            Write-Host "::error::Expected: $expectedHash"
+            Write-Host "::error::Got: $actualHash"
+            exit 1
+          }
+
+          Write-Host "BepInEx download verified" -ForegroundColor Green
+
+          $libsPath = "src/WobblyLifeHeadTracking/libs"
+          Expand-Archive -Path bepinex.zip -DestinationPath bepinex-temp
+          New-Item -ItemType Directory -Path $libsPath -Force | Out-Null
+          Copy-Item bepinex-temp/BepInEx/core/BepInEx.dll $libsPath/
+          Copy-Item bepinex-temp/BepInEx/core/0Harmony.dll $libsPath/
+
+          Remove-Item bepinex.zip
+          Remove-Item -Recurse bepinex-temp
+
+          Write-Host "BepInEx DLLs extracted to $libsPath" -ForegroundColor Green
+
+      - name: Create Unity stub assemblies for CI
+        shell: pwsh
+        run: |
+          Write-Host "Creating Unity stub assemblies for CI build..." -ForegroundColor Cyan
+
+          $libsPath = "src/WobblyLifeHeadTracking/libs"
+
+          # Build UnityEngine.dll with all types from the checked-in UnityStubs.cs
+          $projContent = @"
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net472</TargetFramework>
+              <LangVersion>9.0</LangVersion>
+              <AssemblyName>UnityEngine</AssemblyName>
+              <NoWarn>CS0169;CS0649;CS0067;CS0660;CS0661</NoWarn>
+            </PropertyGroup>
+            <ItemGroup>
+              <Compile Include="UnityStubs.cs" />
+            </ItemGroup>
+          </Project>
+          "@
+          $projPath = Join-Path $libsPath "Stub_UnityEngine.csproj"
+          $projContent | Out-File -FilePath $projPath -Encoding utf8
+
+          dotnet build $projPath -c Release -o $libsPath --nologo -v q
+          if ($LASTEXITCODE -ne 0) {
+              Write-Host "::error::Failed to build UnityEngine stub"
+              exit 1
+          }
+          Write-Host "  Created UnityEngine.dll (with types)" -ForegroundColor Green
+          Remove-Item $projPath -ErrorAction SilentlyContinue
+
+          # Build empty stubs for other Unity modules (to satisfy reference requirements)
+          $emptySource = "// Empty stub assembly"
+          $emptySourcePath = Join-Path $libsPath "EmptyStub.cs"
+          $emptySource | Out-File -FilePath $emptySourcePath -Encoding utf8
+
+          $emptyModules = @(
+              "UnityEngine.CoreModule",
+              "UnityEngine.IMGUIModule",
+              "UnityEngine.PhysicsModule",
+              "UnityEngine.UIModule",
+              "UnityEngine.TextRenderingModule",
+              "UnityEngine.InputModule",
+              "UnityEngine.InputLegacyModule",
+              "UnityEngine.UI"
+          )
+
+          foreach ($moduleName in $emptyModules) {
+              $emptyProjContent = @"
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net472</TargetFramework>
+              <LangVersion>9.0</LangVersion>
+              <AssemblyName>$moduleName</AssemblyName>
+            </PropertyGroup>
+            <ItemGroup>
+              <Compile Include="EmptyStub.cs" />
+            </ItemGroup>
+          </Project>
+          "@
+              $emptyProjPath = Join-Path $libsPath "Stub_$moduleName.csproj"
+              $emptyProjContent | Out-File -FilePath $emptyProjPath -Encoding utf8
+
+              dotnet build $emptyProjPath -c Release -o $libsPath --nologo -v q
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Host "::error::Failed to build $moduleName stub"
+                  exit 1
+              }
+              Write-Host "  Created $moduleName.dll (empty)" -ForegroundColor Green
+              Remove-Item $emptyProjPath -ErrorAction SilentlyContinue
+          }
+
+          # Cleanup temp files
+          Remove-Item $emptySourcePath -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $libsPath "*.deps.json") -Force -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $libsPath "*.pdb") -Force -ErrorAction SilentlyContinue
+          Remove-Item (Join-Path $libsPath "obj") -Recurse -Force -ErrorAction SilentlyContinue
+
+          Write-Host "Unity stub assemblies created successfully" -ForegroundColor Green
+
+      - name: Restore NuGet packages
+        shell: pwsh
+        run: |
+          $unityPath = "${{ github.workspace }}\src\WobblyLifeHeadTracking\libs"
+          dotnet restore src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj "-p:UnityEnginePath=$unityPath"
+
+      - name: Build Debug
+        shell: pwsh
+        run: |
+          Write-Host "Building debug configuration..." -ForegroundColor Cyan
+          $unityPath = "${{ github.workspace }}\src\WobblyLifeHeadTracking\libs"
+          dotnet build src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj --configuration Debug "-p:UnityEnginePath=$unityPath"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::Debug build failed"
+            exit 1
+          }
+
+          Write-Host "Debug build succeeded" -ForegroundColor Green
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          Write-Host "Building release configuration..." -ForegroundColor Cyan
+          $unityPath = "${{ github.workspace }}\src\WobblyLifeHeadTracking\libs"
+          dotnet build src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj --configuration Release "-p:UnityEnginePath=$unityPath"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::Release build failed"
+            exit 1
+          }
+
+          Write-Host "Release build succeeded" -ForegroundColor Green
+
+      - name: Verify build outputs
+        shell: pwsh
+        run: |
+          Write-Host "Verifying build outputs..." -ForegroundColor Cyan
+
+          $requiredFiles = @(
+            "src/WobblyLifeHeadTracking/bin/Debug/net472/WobblyLifeHeadTracking.dll",
+            "src/WobblyLifeHeadTracking/bin/Release/net472/WobblyLifeHeadTracking.dll"
+          )
+
+          $allExist = $true
+          foreach ($file in $requiredFiles) {
+            if (Test-Path $file) {
+              $size = (Get-Item $file).Length / 1KB
+              Write-Host "  $file ($([math]::Round($size, 2)) KB)" -ForegroundColor Green
+            } else {
+              Write-Host "  Missing: $file" -ForegroundColor Red
+              $allExist = $false
+            }
+          }
+
+          if (-not $allExist) {
+            Write-Host "::error::Some build outputs are missing"
+            exit 1
+          }
+
+          Write-Host "All build outputs verified" -ForegroundColor Green
+
+      - name: Package installer
+        shell: pwsh
+        run: |
+          Write-Host "Packaging installer ZIP..." -ForegroundColor Cyan
+          powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::Packaging failed"
+            exit 1
+          }
+
+          Write-Host "Package created" -ForegroundColor Green
+
+      - name: Stage installer contents for artifact upload
+        shell: pwsh
+        run: |
+          Write-Host "Staging installer contents..." -ForegroundColor Cyan
+          $installerZip = Get-ChildItem -Path release -Filter "*-installer.zip" | Select-Object -First 1
+          if (-not $installerZip) {
+            Write-Host "::error::No installer ZIP found in release/"
+            exit 1
+          }
+          $stageDir = "release/artifact-contents"
+          New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
+          Expand-Archive -Path $installerZip.FullName -DestinationPath $stageDir -Force
+          Write-Host "Staged $($installerZip.Name) to $stageDir" -ForegroundColor Green
+
+      - name: Compute artifact name from ref
+        shell: pwsh
+        run: |
+          $branch = if ($env:GITHUB_HEAD_REF) { $env:GITHUB_HEAD_REF } else { $env:GITHUB_REF_NAME }
+          $sanitized = $branch -replace '[^A-Za-z0-9._-]', '-'
+          "ARTIFACT_NAME=WobblyLifeHeadTracking-$sanitized" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: release/artifact-contents/
+          retention-days: 14
+          if-no-files-found: error

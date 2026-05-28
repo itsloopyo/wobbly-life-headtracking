@@ -1,0 +1,44 @@
+# Build output
+bin/
+obj/
+
+# Game reference DLLs (copied at build time, NOT UnityStubs.cs)
+src/*/libs/*.dll
+lib/
+
+# NuGet
+packages/
+*.nupkg
+
+# Release packaging
+dist/
+release/
+prebuilt/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Pixi
+.pixi/
+
+# AI tooling
+.claude/
+.millhouse/
+.lab/
+.mcp.json
+AGENTS.md
+CLAUDE.md
+
+# Nexus listing draft
+NEXUS_MODS.md
+
+# Mod install state marker
+.headtracking-state.json
+
+# OS
+.DS_Store
+Thumbs.db
