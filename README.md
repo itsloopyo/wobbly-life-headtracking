@@ -1,3 +1,10 @@
+> [!CAUTION]
+> ## Experimental prototype - expect missing core features
+>
+> This is **not** a finished mod.
+>
+> Current builds may only test whether head tracking can drive the camera. Bug fixes and core features like decoupled look/aim, independent reticle behavior, correct shot direction, off-screen reticle support, movement handling, and comfort tuning may be missing at this early stage of development.
+
 # Wobbly Life Head Tracking
 
 An unofficial BepInEx plugin that adds OpenTrack head tracking to Wobbly Life, decoupling look from aim and supporting up to 4 players in couch co-op without any VR hardware.

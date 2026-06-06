@@ -1,11 +1,10 @@
 using BepInEx;
 using BepInEx.Logging;
-using CameraUnlock.Core.Data;
-using CameraUnlock.Core.Protocol;
-using UnityEngine;
+using CameraUnlock.Core.Tracking;
+using CameraUnlock.Core.Unity.Extensions;
+using CameraUnlock.Core.Unity.State;
 using WobblyLifeHeadTracking.Camera;
 using WobblyLifeHeadTracking.Config;
-using WobblyLifeHeadTracking.State;
 
 namespace WobblyLifeHeadTracking
 {
@@ -21,37 +20,36 @@ namespace WobblyLifeHeadTracking
 
         private WobblyLifeConfig _config;
         private WobblyLifeCameraController _cameraController;
-        private WobblyLifeGameStateDetector _gameStateDetector;
+        private SceneGameStateDetector _gameStateDetector;
         private bool _trackingEnabled;
         private bool _wasConnected;
         private bool _wasTrackingAllowed;
-        private int _stabilizationFramesRemaining;
-        private const int StabilizationFrameCount = 5;
-
-        private enum TrackingMode { Normal, RotationOnly, PositionOnly }
-        private TrackingMode _trackingMode = TrackingMode.Normal;
 
         private void Awake()
         {
             Log = Logger;
 
             _config = new WobblyLifeConfig(Config);
-            _trackingEnabled = _config.EnableOnStartup;
+            _trackingEnabled = _config.EnableOnStartup.Value;
 
             _cameraController = gameObject.AddComponent<WobblyLifeCameraController>();
             _cameraController.Initialize(_config);
             _cameraController.WorldSpaceYaw = _config.WorldSpaceYaw.Value;
 
-            _gameStateDetector = new WobblyLifeGameStateDetector(_config, Logger.LogInfo);
-            _gameStateDetector.OnGameplayStateChanged += OnGameplayStateChanged;
-            _gameStateDetector.OnPauseStateChanged += OnPauseStateChanged;
+            _gameStateDetector = new SceneGameStateDetector(log: Logger.LogInfo)
+            {
+                DisableInMenuScenes = _config.DisableInMenus.Value,
+                DisableWhenPaused = _config.DisableWhenPaused.Value
+            };
+            _gameStateDetector.GameplayStateChanged += OnGameplayStateChanged;
+            _config.File.SettingChanged += OnConfigSettingChanged;
             _wasTrackingAllowed = _gameStateDetector.IsInGameplay;
 
             Logger.LogInfo($"{PluginName} v{PluginVersion} loaded");
             var ports = _config.PlayerPorts;
             Logger.LogInfo($"Multiplayer head tracking: Player 1=port {ports[0]}, Player 2={ports[1]}, Player 3={ports[2]}, Player 4={ports[3]}");
             Logger.LogInfo($"Head tracking is {(_trackingEnabled ? "enabled" : "disabled")} on startup");
-            Logger.LogInfo($"Controls: Toggle=[{_config.ToggleKeyName}], Recenter=[{_config.RecenterKeyName}]");
+            Logger.LogInfo($"Controls: Toggle=[{_config.ToggleKey.Value}], Recenter=[{_config.RecenterKey.Value}]");
         }
 
         private void Update()
@@ -63,18 +61,10 @@ namespace WobblyLifeHeadTracking
 
         private void HandleKeyBinds()
         {
-            bool chord = (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
-                && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
-
-            if (HotkeyPressed(_config.RecenterKeyEntry.Value, chord, KeyCode.T)) RecenterView();
-            if (HotkeyPressed(_config.ToggleKeyEntry.Value, chord, KeyCode.Y)) ToggleTracking();
-            if (HotkeyPressed(_config.PositionToggleKeyEntry.Value, chord, KeyCode.G)) CycleTrackingMode();
-            if (HotkeyPressed(_config.YawModeKeyEntry.Value, chord, KeyCode.H)) ToggleYawMode();
-        }
-
-        private static bool HotkeyPressed(KeyCode primary, bool chordActive, KeyCode chordKey)
-        {
-            return Input.GetKeyDown(primary) || (chordActive && Input.GetKeyDown(chordKey));
+            if (ChordHotkeys.IsActionPressed(_config.RecenterKey.Value, ChordHotkeys.RecenterLetter)) RecenterView();
+            if (ChordHotkeys.IsActionPressed(_config.ToggleKey.Value, ChordHotkeys.ToggleLetter)) ToggleTracking();
+            if (ChordHotkeys.IsActionPressed(_config.PositionToggleKey.Value, ChordHotkeys.PositionLetter)) CycleTrackingMode();
+            if (ChordHotkeys.IsActionPressed(_config.YawModeKey.Value, ChordHotkeys.FourthToggleLetter)) ToggleYawMode();
         }
 
         public void ToggleYawMode()
@@ -86,28 +76,8 @@ namespace WobblyLifeHeadTracking
 
         private void CycleTrackingMode()
         {
-            switch (_trackingMode)
-            {
-                case TrackingMode.Normal:
-                    _trackingMode = TrackingMode.RotationOnly;
-                    _cameraController.PositionEnabled = false;
-                    _cameraController.RotationEnabled = true;
-                    Logger.LogInfo("Tracking mode: rotation only (position disabled)");
-                    break;
-                case TrackingMode.RotationOnly:
-                    _trackingMode = TrackingMode.PositionOnly;
-                    _cameraController.PositionEnabled = true;
-                    _cameraController.RotationEnabled = false;
-                    Logger.LogInfo("Tracking mode: position only (rotation disabled)");
-                    break;
-                case TrackingMode.PositionOnly:
-                default:
-                    _trackingMode = TrackingMode.Normal;
-                    _cameraController.PositionEnabled = true;
-                    _cameraController.RotationEnabled = true;
-                    Logger.LogInfo("Tracking mode: normal (rotation and position enabled)");
-                    break;
-            }
+            TrackingMode mode = _cameraController.Tracking.CycleMode();
+            Logger.LogInfo($"Tracking mode: {mode.Description()}");
         }
 
         private void LateUpdate()
@@ -125,21 +95,10 @@ namespace WobblyLifeHeadTracking
             if (isConnected && !_wasConnected)
             {
                 Logger.LogInfo($"Head tracking connected - {_cameraController.GetConnectionStatus()}");
-                _stabilizationFramesRemaining = StabilizationFrameCount;
             }
             else if (!isConnected && _wasConnected)
             {
                 Logger.LogInfo("Head tracking disconnected - holding last pose");
-            }
-
-            if (isConnected && _stabilizationFramesRemaining > 0)
-            {
-                _stabilizationFramesRemaining--;
-                if (_stabilizationFramesRemaining == 0)
-                {
-                    _cameraController.RecenterAll();
-                    Logger.LogInfo("Auto-recentered after stabilization");
-                }
             }
 
             _wasConnected = isConnected;
@@ -151,7 +110,7 @@ namespace WobblyLifeHeadTracking
 
             if (!isTrackingAllowed && _wasTrackingAllowed)
             {
-                _cameraController.ResetRotation();
+                _cameraController.ResetTracking();
             }
             else if (isTrackingAllowed && !_wasTrackingAllowed)
             {
@@ -165,31 +124,33 @@ namespace WobblyLifeHeadTracking
         {
             if (!isGameplay && _config.DisableInMenus.Value)
             {
-                _cameraController.ResetRotation();
+                _cameraController.ResetTracking();
                 _cameraController.InvalidateCamera();
             }
         }
 
-        private void OnPauseStateChanged(bool isPaused)
+        private void OnConfigSettingChanged(object sender, BepInEx.Configuration.SettingChangedEventArgs e)
         {
-            if (isPaused && _config.DisableWhenPaused.Value)
-            {
-                _cameraController.ResetRotation();
-            }
+            _gameStateDetector.DisableInMenuScenes = _config.DisableInMenus.Value;
+            _gameStateDetector.DisableWhenPaused = _config.DisableWhenPaused.Value;
         }
 
         private void OnDestroy()
         {
+            if (_config != null)
+            {
+                _config.File.SettingChanged -= OnConfigSettingChanged;
+            }
+
             if (_gameStateDetector != null)
             {
-                _gameStateDetector.OnGameplayStateChanged -= OnGameplayStateChanged;
-                _gameStateDetector.OnPauseStateChanged -= OnPauseStateChanged;
+                _gameStateDetector.GameplayStateChanged -= OnGameplayStateChanged;
                 _gameStateDetector.Dispose();
             }
 
             if (_cameraController != null)
             {
-                _cameraController.ResetRotation();
+                _cameraController.ResetTracking();
             }
 
             Logger.LogInfo($"{PluginName} unloaded");
@@ -209,7 +170,7 @@ namespace WobblyLifeHeadTracking
 
             if (!enabled)
             {
-                _cameraController.ResetRotation();
+                _cameraController.ResetTracking();
             }
 
             Logger.LogInfo($"Head tracking {(enabled ? "enabled" : "disabled")}");

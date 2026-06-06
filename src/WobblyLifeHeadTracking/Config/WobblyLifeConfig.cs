@@ -1,13 +1,12 @@
 using BepInEx.Configuration;
-using CameraUnlock.Core.Config;
 using CameraUnlock.Core.Data;
 using UnityEngine;
 
 namespace WobblyLifeHeadTracking.Config
 {
-    public sealed class WobblyLifeConfig : IHeadTrackingConfig
+    public sealed class WobblyLifeConfig
     {
-        private static readonly float[] ReticleColorRgbaValue = { 1f, 1f, 1f, 1f };
+        public ConfigFile File { get; }
 
         public ConfigEntry<int> Player1Port { get; }
         public ConfigEntry<int> Player2Port { get; }
@@ -23,11 +22,11 @@ namespace WobblyLifeHeadTracking.Config
 
         public ConfigEntry<float> SmoothingFactor { get; }
 
-        public ConfigEntry<bool> EnableOnStartupEntry { get; }
-        public ConfigEntry<KeyCode> ToggleKeyEntry { get; }
-        public ConfigEntry<KeyCode> RecenterKeyEntry { get; }
-        public ConfigEntry<KeyCode> PositionToggleKeyEntry { get; }
-        public ConfigEntry<KeyCode> YawModeKeyEntry { get; }
+        public ConfigEntry<bool> EnableOnStartup { get; }
+        public ConfigEntry<KeyCode> ToggleKey { get; }
+        public ConfigEntry<KeyCode> RecenterKey { get; }
+        public ConfigEntry<KeyCode> PositionToggleKey { get; }
+        public ConfigEntry<KeyCode> YawModeKey { get; }
 
         public ConfigEntry<bool> WorldSpaceYaw { get; }
 
@@ -43,9 +42,10 @@ namespace WobblyLifeHeadTracking.Config
         public ConfigEntry<bool> DisableInMenus { get; }
         public ConfigEntry<bool> DisableWhenPaused { get; }
 
-
         public WobblyLifeConfig(ConfigFile config)
         {
+            File = config;
+
             ConfigEntry<int> BindPort(string key, int defaultPort, string description) =>
                 config.Bind("Network", key, defaultPort,
                     new ConfigDescription(description, new AcceptableValueRange<int>(1024, 65535)));
@@ -66,11 +66,11 @@ namespace WobblyLifeHeadTracking.Config
             SmoothingFactor = BindFloat("Smoothing", "SmoothingFactor", 0f, 0f, 0.95f,
                 "Movement smoothing (0 = none/immediate, higher = smoother but more latency)");
 
-            EnableOnStartupEntry    = config.Bind("Controls", "EnableOnStartup",   true,             "Enable head tracking when game starts");
-            ToggleKeyEntry          = config.Bind("Controls", "ToggleKey",         KeyCode.End,      "Key to toggle head tracking on/off");
-            RecenterKeyEntry        = config.Bind("Controls", "RecenterKey",       KeyCode.Home,     "Key to recenter view to current head position");
-            PositionToggleKeyEntry  = config.Bind("Controls", "PositionToggleKey", KeyCode.PageUp,   "Key to toggle positional tracking on/off");
-            YawModeKeyEntry         = config.Bind("Controls", "YawModeKey",        KeyCode.PageDown, "Key to toggle yaw mode (world-space horizon-locked vs camera-local)");
+            EnableOnStartup   = config.Bind("Controls", "EnableOnStartup",   true,             "Enable head tracking when game starts");
+            ToggleKey         = config.Bind("Controls", "ToggleKey",         KeyCode.End,      "Key to toggle head tracking on/off");
+            RecenterKey       = config.Bind("Controls", "RecenterKey",       KeyCode.Home,     "Key to recenter view to current head position");
+            PositionToggleKey = config.Bind("Controls", "PositionToggleKey", KeyCode.PageUp,   "Key to cycle tracking mode (6DOF / rotation only / position only)");
+            YawModeKey        = config.Bind("Controls", "YawModeKey",        KeyCode.PageDown, "Key to toggle yaw mode (world-space horizon-locked vs camera-local)");
 
             WorldSpaceYaw = config.Bind("General", "WorldSpaceYaw", true,
                 "true = horizon-locked yaw (default); false = camera-local yaw. Camera-local produces leaning at extreme pitch.");
@@ -90,21 +90,11 @@ namespace WobblyLifeHeadTracking.Config
             _playerPorts = new[] { Player1Port.Value, Player2Port.Value, Player3Port.Value, Player4Port.Value };
         }
 
-        public int UdpPort => Player1Port.Value;
-
-        public bool EnableOnStartup => EnableOnStartupEntry.Value;
-
         public SensitivitySettings Sensitivity => new SensitivitySettings(
             YawSensitivity.Value,
             PitchSensitivity.Value,
             RollSensitivity.Value
         );
-
-        public string RecenterKeyName => RecenterKeyEntry.Value.ToString();
-
-        public string ToggleKeyName => ToggleKeyEntry.Value.ToString();
-
-        public float Smoothing => SmoothingFactor.Value;
 
         public PositionSettings PositionSettingsFromConfig => new PositionSettings(
             PositionSensitivityX.Value,
@@ -112,16 +102,11 @@ namespace WobblyLifeHeadTracking.Config
             PositionSensitivityZ.Value,
             PositionLimitX.Value,
             PositionLimitY.Value,
+            PositionLimitYDown.Value,
             PositionLimitZ.Value,
             0.10f,
             PositionSmoothing.Value,
             invertX: true, invertY: false, invertZ: true
         );
-
-        public bool AimDecouplingEnabled => false;
-
-        public bool ShowDecoupledReticle => false;
-
-        public float[] ReticleColorRgba => ReticleColorRgbaValue;
     }
 }

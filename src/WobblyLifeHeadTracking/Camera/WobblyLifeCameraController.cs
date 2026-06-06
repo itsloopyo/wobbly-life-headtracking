@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using CameraUnlock.Core.Data;
-using CameraUnlock.Core.Math;
-using CameraUnlock.Core.Processing;
-using CameraUnlock.Core.Protocol;
+using CameraUnlock.Core.Tracking;
 using CameraUnlock.Core.Unity.Rendering;
 using CameraUnlock.Core.Unity.Tracking;
 using UnityEngine;
@@ -14,37 +12,24 @@ namespace WobblyLifeHeadTracking.Camera
 {
     public sealed class WobblyLifeCameraController : MonoBehaviour
     {
-        public const int MaxPlayers = 4;
-
         private WobblyLifeConfig _config;
-
-        private readonly OpenTrackReceiver[] _receivers = new OpenTrackReceiver[MaxPlayers];
-        private readonly float[] _headYaw = new float[MaxPlayers];
-        private readonly float[] _headPitch = new float[MaxPlayers];
-        private readonly float[] _headRoll = new float[MaxPlayers];
-        private readonly Quaternion[] _headRotations = new Quaternion[MaxPlayers];
-        private readonly Quaternion[] _yawWorldRotations = new Quaternion[MaxPlayers];
-        private readonly Quaternion[] _pitchRollLocalRotations = new Quaternion[MaxPlayers];
-        private readonly SmoothedEulerState[] _smoothedStates = new SmoothedEulerState[MaxPlayers];
-        private readonly bool[] _receiverStarted = new bool[MaxPlayers];
-        private readonly bool[] _hasTrackingData = new bool[MaxPlayers];
-
-        private readonly PoseInterpolator[] _poseInterpolators = new PoseInterpolator[MaxPlayers];
-
-        private readonly PositionProcessor[] _positionProcessors = new PositionProcessor[MaxPlayers];
-        private readonly PositionInterpolator[] _positionInterpolators = new PositionInterpolator[MaxPlayers];
-        private readonly Vec3[] _positionOffsets = new Vec3[MaxPlayers];
+        private MultiPlayerTrackingManager _tracking;
 
         public bool WorldSpaceYaw { get; set; } = true;
-        public bool PositionEnabled { get; set; } = true;
-        public bool RotationEnabled { get; set; } = true;
 
-        private readonly Dictionary<int, CameraFrameState> _cameraStates = new Dictionary<int, CameraFrameState>();
+        public MultiPlayerTrackingManager Tracking => _tracking;
+
+        private sealed class CameraState
+        {
+            public readonly TransformFrameState FrameState = new TransformFrameState();
+            public int PlayerIndex = -1;
+        }
+
+        private readonly Dictionary<int, CameraState> _cameraStates = new Dictionary<int, CameraState>();
 
         // Shared sentinel stored in _cameraStates for cameras we've classified as non-gameplay.
-        // Lets OnBeginCameraRendering bail with a single dictionary lookup instead of a
-        // dictionary miss followed by a separate HashSet hit per camera per render pass.
-        private static readonly CameraFrameState NonGameplaySentinel = new CameraFrameState { PlayerIndex = -1 };
+        // Lets OnBeginCameraRendering bail with a single dictionary lookup per camera per render pass.
+        private static readonly CameraState NonGameplaySentinel = new CameraState();
 
         private static Type _gameplayCameraType;
         private static MethodInfo _getLocalPlayerIdMethod;
@@ -53,93 +38,37 @@ namespace WobblyLifeHeadTracking.Camera
         private bool _initialized;
         private bool _isHooked;
 
-        private class CameraFrameState
-        {
-            public Quaternion StoredRotation;
-            public Vector3 StoredWorldPosition;
-            public int LastStoredFrame = -1;
-            public bool TrackingApplied;
-            public bool RotationModified;
-            public bool PositionModified;
-            public int PlayerIndex = -1;
-        }
-
-        // Cached config values, refreshed via SettingChanged subscriptions so the hot path
-        // never acquires the ConfigEntry lock per frame.
-        private SensitivitySettings _cachedSensitivity;
-        private float _cachedSmoothing;
-        private float _cachedPositionLimitY;
-        private float _cachedPositionLimitYDown;
-
         public void Initialize(WobblyLifeConfig config)
         {
             _config = config;
 
-            for (int i = 0; i < MaxPlayers; i++)
+            _tracking = new MultiPlayerTrackingManager(_config.PlayerPorts)
             {
-                _headYaw[i] = 0f;
-                _headPitch[i] = 0f;
-                _headRoll[i] = 0f;
-                _headRotations[i] = Quaternion.identity;
-                _yawWorldRotations[i] = Quaternion.identity;
-                _pitchRollLocalRotations[i] = Quaternion.identity;
-                _smoothedStates[i] = new SmoothedEulerState();
-                _hasTrackingData[i] = false;
-            }
-
-            PositionSettings posSettings = _config.PositionSettingsFromConfig;
-            for (int i = 0; i < MaxPlayers; i++)
-            {
-                _poseInterpolators[i] = new PoseInterpolator();
-                _positionProcessors[i] = new PositionProcessor
-                {
-                    Settings = posSettings
-                };
-                _positionInterpolators[i] = new PositionInterpolator();
-            }
-
-            int[] ports = _config.PlayerPorts;
-            for (int i = 0; i < MaxPlayers; i++)
-            {
-                int port = ports[i];
-                _receivers[i] = new OpenTrackReceiver();
-                _receivers[i].Log = msg => WobblyLifeHeadTrackingPlugin.Log?.LogInfo(msg);
-
-                // Start() returning false just means initial bind lost the race; the receiver's
-                // own retry thread keeps trying every 5s. Leave the slot live so IsReceiving
-                // picks it up the moment retry succeeds.
-                _receivers[i].Start(port);
-                _receiverStarted[i] = true;
-                WobblyLifeHeadTrackingPlugin.Log?.LogInfo($"Player {i + 1} receiver listening on port {port}");
-            }
+                Log = msg => WobblyLifeHeadTrackingPlugin.Log?.LogInfo(msg)
+            };
+            ApplyTrackingSettings();
+            _tracking.Start();
 
             InitializeReflection();
 
-            RefreshCachedConfig();
-            _config.YawSensitivity.SettingChanged += OnConfigSettingChanged;
-            _config.PitchSensitivity.SettingChanged += OnConfigSettingChanged;
-            _config.RollSensitivity.SettingChanged += OnConfigSettingChanged;
-            _config.SmoothingFactor.SettingChanged += OnConfigSettingChanged;
-            _config.PositionLimitY.SettingChanged += OnConfigSettingChanged;
-            _config.PositionLimitYDown.SettingChanged += OnConfigSettingChanged;
+            // Sensitivity/smoothing/position settings are pushed into the tracking manager,
+            // so re-push whenever any config value changes (changes are rare; re-applying
+            // everything is cheaper than tracking which entry changed).
+            _config.File.SettingChanged += OnConfigSettingChanged;
 
             _initialized = true;
         }
 
-        private void OnConfigSettingChanged(object sender, System.EventArgs e)
+        private void OnConfigSettingChanged(object sender, BepInEx.Configuration.SettingChangedEventArgs e)
         {
-            RefreshCachedConfig();
+            ApplyTrackingSettings();
         }
 
-        private void RefreshCachedConfig()
+        private void ApplyTrackingSettings()
         {
-            _cachedSensitivity = new SensitivitySettings(
-                _config.YawSensitivity.Value,
-                _config.PitchSensitivity.Value,
-                _config.RollSensitivity.Value);
-            _cachedSmoothing = _config.SmoothingFactor.Value;
-            _cachedPositionLimitY = _config.PositionLimitY.Value;
-            _cachedPositionLimitYDown = _config.PositionLimitYDown.Value;
+            _tracking.ApplySensitivity(_config.Sensitivity);
+            _tracking.ApplySmoothing(_config.SmoothingFactor.Value);
+            _tracking.ApplyPositionSettings(_config.PositionSettingsFromConfig);
         }
 
         private void InitializeReflection()
@@ -184,73 +113,14 @@ namespace WobblyLifeHeadTracking.Camera
 
             object result = _getLocalPlayerIdMethod.Invoke(gameplayCamera, null);
             if (!(result is int playerId)) return 0;
-            return Mathf.Clamp(playerId, 0, MaxPlayers - 1);
+            return Mathf.Clamp(playerId, 0, _tracking.PlayerCount - 1);
         }
 
         public void UpdateTracking()
         {
             if (!_initialized) return;
 
-            float deltaTime = Time.deltaTime;
-            SensitivitySettings sensitivity = _cachedSensitivity;
-            float baseSmoothing = _cachedSmoothing;
-
-            // Local floor absorbs velocity kinks from linear interpolation between samples.
-            const float BaselineSmoothing = 0.05f;
-            if (baseSmoothing < BaselineSmoothing)
-                baseSmoothing = BaselineSmoothing;
-
-            bool positionEnabled = PositionEnabled;
-            float posLimitYDown = positionEnabled ? _cachedPositionLimitYDown : 0f;
-            float posLimitYUp = positionEnabled ? _cachedPositionLimitY : 0f;
-
-            for (int i = 0; i < MaxPlayers; i++)
-            {
-                var receiver = _receivers[i];
-                if (!_receiverStarted[i] || receiver == null) continue;
-                if (!receiver.IsReceiving) continue;
-
-                TrackingPose pose = receiver.GetLatestPose();
-
-                TrackingPose interpolated = _poseInterpolators[i].Update(pose, deltaTime);
-                pose = interpolated;
-
-                if (!pose.IsValid || !pose.IsDataFresh) continue;
-
-                TrackingPose processed = pose.ApplySensitivity(sensitivity);
-
-                float targetYaw = processed.Yaw;
-                float targetPitch = processed.Pitch;
-                float targetRoll = processed.Roll;
-
-                _smoothedStates[i].Update(targetYaw, targetPitch, targetRoll,
-                    baseSmoothing, deltaTime,
-                    out float sYaw, out float sPitch, out float sRoll);
-                _headYaw[i] = sYaw;
-                _headPitch[i] = sPitch;
-                _headRoll[i] = sRoll;
-
-                // Precompose once per frame; the render callback may fire per camera pass.
-                Quaternion yawQ = Quaternion.AngleAxis(sYaw, Vector3.up);
-                Quaternion pitchQ = Quaternion.AngleAxis(-sPitch, Vector3.right);
-                Quaternion rollQ = Quaternion.AngleAxis(sRoll, Vector3.forward);
-                _headRotations[i] = rollQ * pitchQ * yawQ;
-                _yawWorldRotations[i] = yawQ;
-                _pitchRollLocalRotations[i] = rollQ * pitchQ;
-
-                _hasTrackingData[i] = true;
-
-                if (positionEnabled && _positionProcessors[i] != null && _positionInterpolators[i] != null)
-                {
-                    var rawPos = receiver.GetLatestPosition();
-                    var interpolatedPos = _positionInterpolators[i].Update(rawPos, deltaTime);
-                    var headRotQ = QuaternionUtils.FromYawPitchRoll(processed.Yaw, -processed.Pitch, processed.Roll);
-                    Vec3 posOffset = _positionProcessors[i].Process(interpolatedPos, headRotQ, deltaTime);
-                    // Asymmetric Y clamp prevents camera from clipping below eye height.
-                    float clampedY = Mathf.Clamp(posOffset.Y, -posLimitYDown, posLimitYUp);
-                    _positionOffsets[i] = new Vec3(posOffset.X, clampedY, posOffset.Z);
-                }
-            }
+            _tracking.Update(Time.deltaTime);
 
             if (!_isHooked)
             {
@@ -273,8 +143,7 @@ namespace WobblyLifeHeadTracking.Camera
                     return;
                 }
 
-                state = new CameraFrameState();
-                state.PlayerIndex = GetPlayerIndexForCamera(cam);
+                state = new CameraState { PlayerIndex = GetPlayerIndexForCamera(cam) };
                 _cameraStates[camId] = state;
 
                 if (state.PlayerIndex >= 0)
@@ -285,47 +154,28 @@ namespace WobblyLifeHeadTracking.Camera
 
             int playerIndex = state.PlayerIndex;
             if (playerIndex < 0) return;
-            if (!_hasTrackingData[playerIndex]) return;
+            if (!_tracking.HasPose(playerIndex)) return;
 
-            int frameCount = Time.frameCount;
             var camTransform = cam.transform;
+            if (!state.FrameState.BeginFrame(camTransform, Time.frameCount)) return;
 
-            // Store the game's transform once per frame because OnBegin can fire multiple
-            // times per camera (shadows, reflections) and we must restore the clean value.
-            if (state.LastStoredFrame != frameCount)
-            {
-                state.StoredRotation = camTransform.rotation;
-                state.StoredWorldPosition = camTransform.position;
-                state.LastStoredFrame = frameCount;
-                state.TrackingApplied = false;
-                state.RotationModified = false;
-                state.PositionModified = false;
-            }
+            HeadTrackingSession session = _tracking.GetSession(playerIndex);
 
-            if (state.TrackingApplied) return;
-
-            if (PositionEnabled)
+            if (session.PositionActive)
             {
                 Vector3 worldOffset = PositionApplicator.ToHorizonLockedWorld(
-                    _positionOffsets[playerIndex], state.StoredRotation);
-                camTransform.position = state.StoredWorldPosition + worldOffset;
-                state.PositionModified = true;
+                    session.PositionOffset, state.FrameState.StoredRotation);
+                state.FrameState.SetPosition(camTransform, state.FrameState.StoredPosition + worldOffset);
             }
 
-            if (RotationEnabled)
+            if (session.RotationActive)
             {
-                if (WorldSpaceYaw)
-                {
-                    // Yaw around world up first (horizon-locked), then pitch+roll camera-local.
-                    camTransform.rotation = _yawWorldRotations[playerIndex] * state.StoredRotation * _pitchRollLocalRotations[playerIndex];
-                }
-                else
-                {
-                    camTransform.rotation = state.StoredRotation * _headRotations[playerIndex];
-                }
-                state.RotationModified = true;
+                TrackingPose head = session.Rotation;
+                Quaternion tracked = WorldSpaceYaw
+                    ? CameraRotationComposer.ComposeAdditive(state.FrameState.StoredRotation, head.Yaw, head.Pitch, head.Roll)
+                    : state.FrameState.StoredRotation * CameraRotationComposer.GetTrackingOnlyRotation(head.Yaw, -head.Pitch, head.Roll);
+                state.FrameState.SetRotation(camTransform, tracked);
             }
-            state.TrackingApplied = true;
         }
 
         private void OnEndCameraRendering(UnityEngine.Camera cam)
@@ -334,93 +184,37 @@ namespace WobblyLifeHeadTracking.Camera
 
             int camId = cam.GetInstanceID();
             if (!_cameraStates.TryGetValue(camId, out var state)) return;
+            if (state.PlayerIndex < 0) return;
 
-            // Restore before game logic reads transform, so aim/physics/raycasts see clean state.
-            // Only touch the components we actually modified - skips a native transform write
-            // per camera per pass when only one of rotation/position is enabled.
-            if (state.LastStoredFrame == Time.frameCount && state.TrackingApplied)
-            {
-                var camTransform = cam.transform;
-                if (state.RotationModified)
-                {
-                    camTransform.rotation = state.StoredRotation;
-                    state.RotationModified = false;
-                }
-                if (state.PositionModified)
-                {
-                    camTransform.position = state.StoredWorldPosition;
-                    state.PositionModified = false;
-                }
-            }
+            // Restore before game logic reads the transform, so aim/physics/raycasts see clean state.
+            state.FrameState.Restore(cam.transform, Time.frameCount);
         }
 
-        public void ResetRotation()
+        public void ResetTracking()
         {
-            for (int i = 0; i < MaxPlayers; i++)
-            {
-                _headYaw[i] = 0f;
-                _headPitch[i] = 0f;
-                _headRoll[i] = 0f;
-                _headRotations[i] = Quaternion.identity;
-                _yawWorldRotations[i] = Quaternion.identity;
-                _pitchRollLocalRotations[i] = Quaternion.identity;
-                _smoothedStates[i]?.Reset();
-                _poseInterpolators[i]?.Reset();
-                _hasTrackingData[i] = false;
-                _positionProcessors[i]?.Reset();
-                _positionInterpolators[i]?.Reset();
-                _positionOffsets[i] = Vec3.Zero;
-            }
+            if (!_initialized) return;
+            _tracking.Reset();
         }
 
         public void InvalidateCamera()
         {
             _cameraStates.Clear();
-            ResetRotation();
-        }
-
-        private bool IsPlayerReceiving(int playerIndex)
-        {
-            return _receiverStarted[playerIndex]
-                && _receivers[playerIndex] != null
-                && _receivers[playerIndex].IsReceiving;
+            ResetTracking();
         }
 
         public void RecenterAll()
         {
-            for (int i = 0; i < MaxPlayers; i++)
-            {
-                if (IsPlayerReceiving(i))
-                {
-                    _receivers[i].Recenter();
-                    _smoothedStates[i]?.Reset();
-                    _poseInterpolators[i]?.Reset();
-                    _positionProcessors[i]?.SetCenter(_receivers[i].GetLatestPosition());
-                    _positionInterpolators[i]?.Reset();
-                    WobblyLifeHeadTrackingPlugin.Log?.LogInfo($"Player {i + 1} view recentered");
-                }
-            }
+            _tracking.Recenter();
         }
 
         public bool IsAnyPlayerReceiving()
         {
-            for (int i = 0; i < MaxPlayers; i++)
-            {
-                if (IsPlayerReceiving(i))
-                    return true;
-            }
-            return false;
+            return _initialized && _tracking.IsAnyReceiving;
         }
 
         public string GetConnectionStatus()
         {
-            var connected = new List<int>();
-            for (int i = 0; i < MaxPlayers; i++)
-            {
-                if (IsPlayerReceiving(i))
-                    connected.Add(i + 1);
-            }
-            return connected.Count > 0 ? $"Players {string.Join(", ", connected)} connected" : "No players connected";
+            return _tracking.GetConnectionStatus();
         }
 
         private void OnDestroy()
@@ -433,18 +227,10 @@ namespace WobblyLifeHeadTracking.Camera
 
             if (_config != null)
             {
-                _config.YawSensitivity.SettingChanged -= OnConfigSettingChanged;
-                _config.PitchSensitivity.SettingChanged -= OnConfigSettingChanged;
-                _config.RollSensitivity.SettingChanged -= OnConfigSettingChanged;
-                _config.SmoothingFactor.SettingChanged -= OnConfigSettingChanged;
-                _config.PositionLimitY.SettingChanged -= OnConfigSettingChanged;
-                _config.PositionLimitYDown.SettingChanged -= OnConfigSettingChanged;
+                _config.File.SettingChanged -= OnConfigSettingChanged;
             }
 
-            for (int i = 0; i < MaxPlayers; i++)
-            {
-                _receivers[i]?.Dispose();
-            }
+            _tracking?.Dispose();
         }
     }
 }
