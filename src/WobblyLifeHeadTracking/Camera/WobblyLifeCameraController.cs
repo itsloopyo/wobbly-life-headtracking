@@ -137,19 +137,17 @@ namespace WobblyLifeHeadTracking.Camera
 
             if (!_cameraStates.TryGetValue(camId, out var state))
             {
-                if (!cam.name.Contains("GameplayCamera"))
+                int assignedIndex = GetPlayerIndexForCamera(cam);
+                if (assignedIndex < 0)
                 {
                     _cameraStates[camId] = NonGameplaySentinel;
                     return;
                 }
 
-                state = new CameraState { PlayerIndex = GetPlayerIndexForCamera(cam) };
+                state = new CameraState { PlayerIndex = assignedIndex };
                 _cameraStates[camId] = state;
 
-                if (state.PlayerIndex >= 0)
-                {
-                    WobblyLifeHeadTrackingPlugin.Log?.LogInfo($"Camera {cam.name} assigned to player {state.PlayerIndex + 1}");
-                }
+                WobblyLifeHeadTrackingPlugin.Log?.LogInfo($"Camera {cam.name} assigned to player {assignedIndex + 1}");
             }
 
             int playerIndex = state.PlayerIndex;
