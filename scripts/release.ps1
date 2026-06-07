@@ -22,7 +22,10 @@
 param(
     [Parameter(Position=0)]
     [string]$Version = "",
-    [switch]$AllowDirty
+    [switch]$AllowDirty,
+    # Ship a release even when there are no user-facing commits since the
+    # last tag (writes a maintenance changelog entry instead of aborting).
+    [switch]$Force
 )
 
 Set-StrictMode -Version Latest
@@ -45,6 +48,22 @@ $pluginPath = Join-Path $projectDir "src\WobblyLifeHeadTracking\WobblyLifeHeadTr
 $pixiPath = Join-Path $projectDir "pixi.toml"
 
 Import-Module (Join-Path $projectDir "cameraunlock-core\powershell\ReleaseWorkflow.psm1") -Force
+
+# Mirrors New-ChangelogFromCommits' insertion so a -Force maintenance entry
+# lands in the same place with the same shape.
+function Add-MaintenanceChangelogEntry {
+    param([string]$Path, [string]$NewVersion)
+    $date = Get-Date -Format 'yyyy-MM-dd'
+    $entry = "## [$NewVersion] - $date`n`n### Changed`n`n- Maintenance release (no user-facing changes).`n`n"
+    $changelog = Get-Content $Path -Raw
+    if ($changelog -match '(?s)(# Changelog.*?)(## \[)') {
+        $changelog = $changelog -replace '(?s)(# Changelog.*?\n\n)', "`$1$entry"
+    } else {
+        $changelog = $changelog -replace '(?s)(# Changelog.*?\n)', "`$1$entry"
+    }
+    $changelog = $changelog.TrimEnd() + "`n"
+    Set-Content $Path $changelog -NoNewline
+}
 
 # Function to get current version from csproj
 function Get-CurrentVersion {
@@ -131,19 +150,47 @@ Write-Host "Current version: $currentVersion" -ForegroundColor Gray
 Write-Host "New version:     $Version" -ForegroundColor Green
 Write-Host ""
 
-# Step 1: Update csproj version
+# Step 1: generate CHANGELOG from commits since last tag. This is the gate
+# that aborts when there are no user-facing commits, so run it BEFORE
+# mutating any version files - a failure here then leaves a clean tree
+# instead of stranding a half-applied version bump with no tag.
+Write-Host "Generating CHANGELOG from commits..." -ForegroundColor Cyan
+$changelogPath = Join-Path $projectDir "CHANGELOG.md"
+$hasExistingTags = git tag -l 2>$null
+if (-not $hasExistingTags) {
+    # First release - ensure a baseline CHANGELOG exists
+    if (-not (Test-Path $changelogPath)) {
+        $date = Get-Date -Format 'yyyy-MM-dd'
+        "# Changelog`n`n## [$Version] - $date`n`nFirst release.`n" | Set-Content $changelogPath
+        Write-Host "  Wrote initial CHANGELOG.md" -ForegroundColor Gray
+    }
+} else {
+    try {
+        New-ChangelogFromCommits -ChangelogPath $changelogPath -Version $Version -ArtifactPaths @("src/")
+    } catch {
+        if (-not $Force) {
+            Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "No user-facing changes to release. Re-run with -Force for a maintenance release." -ForegroundColor Yellow
+            exit 1
+        }
+        Write-Host "No user-facing commits since last tag - writing maintenance entry (-Force)." -ForegroundColor Yellow
+        Add-MaintenanceChangelogEntry -Path $changelogPath -NewVersion $Version
+    }
+}
+
+# Step 2: Update csproj version
 Write-Host "Updating csproj version to $Version..." -ForegroundColor Cyan
 Set-CsprojVersion $Version
 
-# Step 2: Update plugin version
+# Step 3: Update plugin version
 Write-Host "Updating plugin version to $Version..." -ForegroundColor Cyan
 Set-PluginVersion $Version
 
-# Step 3: Update pixi.toml version
+# Step 4: Update pixi.toml version
 Write-Host "Updating pixi.toml version to $Version..." -ForegroundColor Cyan
 Set-PixiVersion $Version
 
-# Step 4: Build release to verify version compiles
+# Step 5: Build release to verify version compiles
 Write-Host "Building release..." -ForegroundColor Cyan
 & pixi run build
 if ($LASTEXITCODE -ne 0) {
@@ -151,21 +198,16 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Step 5: Generate CHANGELOG
-Write-Host "Generating CHANGELOG from commits..." -ForegroundColor Cyan
-$changelogPath = Join-Path $projectDir "CHANGELOG.md"
-New-ChangelogFromCommits -ChangelogPath $changelogPath -Version $Version -ArtifactPaths @("src/")
-
-# Step 5: Commit
+# Step 6: Commit
 Write-Host "Committing version change..." -ForegroundColor Cyan
 git add $csprojPath $pluginPath $pixiPath $changelogPath
 git commit -m "Release v$Version"
 
-# Step 5: Create tag
+# Step 7: Create tag
 Write-Host "Creating tag $tagName..." -ForegroundColor Cyan
 git tag $tagName
 
-# Step 6: Push
+# Step 8: Push
 Write-Host "Pushing to GitHub..." -ForegroundColor Cyan
 git push origin main
 git push origin $tagName
