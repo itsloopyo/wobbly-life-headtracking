@@ -29,9 +29,38 @@ $gameId = 'wobbly-life'
 $config = Get-GameConfig -GameId $gameId
 $StateFileName = ".headtracking-state.json"
 
-# BepInEx version and download URL
-$BepInExVersion = "5.4.23.4"
-$BepInExUrl = "https://github.com/BepInEx/BepInEx/releases/download/v$BepInExVersion/BepInEx_win_x64_$BepInExVersion.zip"
+$vendorDir = Join-Path $projectRoot "vendor\bepinex"
+$vendorZip = Join-Path $vendorDir "BepInEx_win_x64.zip"
+
+if (-not (Test-Path $vendorZip)) {
+    Write-Host "ERROR: Vendored BepInEx not found at: $vendorZip" -ForegroundColor Red
+    Write-Host "Run 'pixi run update-deps' to fetch it." -ForegroundColor Yellow
+    exit 1
+}
+
+$vendorReadme = Get-Content (Join-Path $vendorDir "README.md") -Raw
+$versionMatch = [regex]::Match($vendorReadme, '(?m)^- Tag: `v([^`]+)`')
+if (-not $versionMatch.Success) {
+    Write-Host "ERROR: Could not read the BepInEx tag from $vendorDir\README.md" -ForegroundColor Red
+    exit 1
+}
+$BepInExVersion = $versionMatch.Groups[1].Value
+
+# Every file BepInEx needs to actually start. Checking one marker (or just
+# that BepInEx\core\ exists) is not enough: a half-deleted loader keeps
+# BepInEx.dll while doorstop_config.ini and the Cecil/MonoMod assemblies go
+# missing, so Doorstop loads with no target, the chainloader never runs, and
+# a marker-only check reports the loader as installed and skips the repair.
+$LoaderFiles = @(
+    "doorstop_config.ini"
+    "winhttp.dll"
+    "BepInEx\core\BepInEx.dll"
+    "BepInEx\core\BepInEx.Preloader.dll"
+    "BepInEx\core\0Harmony.dll"
+    "BepInEx\core\Mono.Cecil.dll"
+    "BepInEx\core\MonoMod.Utils.dll"
+    "BepInEx\core\MonoMod.RuntimeDetour.dll"
+)
 
 # Find game installation
 $gamePath = Find-GamePath -GameId $gameId
@@ -46,34 +75,38 @@ Write-Host "Found Wobbly Life at: $gamePath" -ForegroundColor Green
 # Track whether we install BepInEx
 $installedBepInEx = $false
 
-# Install BepInEx if missing
-$bepinexCorePath = Join-Path $gamePath "BepInEx\core"
-if (-not (Test-Path $bepinexCorePath)) {
-    Write-Host "BepInEx not found. Installing BepInEx $BepInExVersion..." -ForegroundColor Yellow
+$missingLoaderFiles = @($LoaderFiles | Where-Object { -not (Test-Path (Join-Path $gamePath $_)) })
 
-    $tempZip = Join-Path $env:TEMP "BepInEx_$BepInExVersion.zip"
+if ($missingLoaderFiles.Count -gt 0) {
+    $loaderAbsent = -not (Test-Path (Join-Path $gamePath "BepInEx\core\BepInEx.dll"))
 
-    Write-Host "  Downloading from $BepInExUrl..." -ForegroundColor Gray
-    try {
-        Invoke-WebRequest -Uri $BepInExUrl -OutFile $tempZip -UseBasicParsing
-    } catch {
-        Write-Host "ERROR: Failed to download BepInEx: $_" -ForegroundColor Red
+    if ($loaderAbsent) {
+        Write-Host "BepInEx not found. Installing $BepInExVersion from the vendored copy..." -ForegroundColor Yellow
+    } else {
+        Write-Host "BepInEx is installed but incomplete - repairing from the vendored copy." -ForegroundColor Yellow
+        foreach ($f in $missingLoaderFiles) {
+            Write-Host "  missing: $f" -ForegroundColor Gray
+        }
+    }
+
+    # The vendored zip carries no BepInEx\config or BepInEx\plugins entries,
+    # so extracting over an existing install restores the loader without
+    # touching user config or other plugins.
+    Expand-Archive -Path $vendorZip -DestinationPath $gamePath -Force
+
+    $stillMissing = @($LoaderFiles | Where-Object { -not (Test-Path (Join-Path $gamePath $_)) })
+    if ($stillMissing.Count -gt 0) {
+        Write-Host "ERROR: BepInEx is still incomplete after extracting $vendorZip" -ForegroundColor Red
+        foreach ($f in $stillMissing) {
+            Write-Host "  missing: $f" -ForegroundColor Red
+        }
         exit 1
     }
 
-    Write-Host "  Extracting to $gamePath..." -ForegroundColor Gray
-    try {
-        Expand-Archive -Path $tempZip -DestinationPath $gamePath -Force
-    } catch {
-        Write-Host "ERROR: Failed to extract BepInEx: $_" -ForegroundColor Red
-        exit 1
-    }
-
-    Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
-
-    $installedBepInEx = $true
-    Write-Host "  BepInEx installed successfully!" -ForegroundColor Green
-    Write-Host "  NOTE: Run Wobbly Life once to let BepInEx initialize before testing mods." -ForegroundColor Yellow
+    # Repairing someone else's loader must not transfer ownership of it, so
+    # only claim it when nothing was there to begin with.
+    $installedBepInEx = $loaderAbsent
+    Write-Host "  BepInEx $BepInExVersion ready." -ForegroundColor Green
 }
 
 $pluginsPath = Join-Path $gamePath "BepInEx\plugins"
