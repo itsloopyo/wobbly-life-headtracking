@@ -67,7 +67,9 @@ namespace WobblyLifeHeadTracking.Camera
         private void ApplyTrackingSettings()
         {
             _tracking.ApplySensitivity(_config.Sensitivity);
-            _tracking.ApplySmoothing(_config.SmoothingFactor.Value);
+            // Both values go to every player's processor; the manager selects between
+            // them per player from that player's receiver connection locality.
+            _tracking.ApplySmoothing(_config.LocalSmoothing.Value, _config.RemoteSmoothing.Value);
             _tracking.ApplyPositionSettings(_config.PositionSettingsFromConfig);
         }
 

@@ -80,9 +80,10 @@ For couch co-op, each player needs their own tracker on a separate port. Ports a
 
 | Action | Nav cluster | Chord |
 |--------|-------------|-------|
-| Recenter view | **Home** | **Ctrl+Shift+R** |
-| Toggle head tracking | **End** | **Ctrl+Shift+H** |
-| Toggle positional tracking | **Page Up** | **Ctrl+Shift+P** |
+| Recenter view | **Home** | **Ctrl+Shift+T** |
+| Toggle head tracking | **End** | **Ctrl+Shift+Y** |
+| Cycle tracking mode | **Page Up** | **Ctrl+Shift+G** |
+| Toggle yaw mode | **Page Down** | **Ctrl+Shift+H** |
 
 ## Verifying Installation
 
@@ -111,28 +112,36 @@ PitchSensitivity = 1.0
 RollSensitivity = 1.0
 
 [Smoothing]
-SmoothingFactor = 0.0
+LocalSmoothing = 0.0
+RemoteSmoothing = 0.15
+
+[General]
+WorldSpaceYaw = true
 
 [Controls]
 EnableOnStartup = true
 ToggleKey = End
 RecenterKey = Home
 PositionToggleKey = PageUp
+YawModeKey = PageDown
 
 [Position]
-SensitivityX = 200.0
-SensitivityY = 200.0
-SensitivityZ = 2.0
+SensitivityX = 1.0
+SensitivityY = 1.0
+SensitivityZ = 1.0
 LimitX = 0.30
 LimitY = 0.15
 LimitYDown = 0.05
 LimitZ = 0.40
-Smoothing = 0.15
 
 [GameState]
 DisableInMenus = true
 DisableWhenPaused = true
 ```
+
+`LocalSmoothing` applies when the tracker runs on this machine, `RemoteSmoothing`
+when it is a phone or other network device. Both cover rotation and position, and
+the value is picked per connection from the packet source address.
 
 ## Troubleshooting
 
@@ -152,7 +161,7 @@ DisableWhenPaused = true
 
 ### Camera jittering
 
-1. Increase `SmoothingFactor` in config (try 0.5-0.7)
+1. Increase `RemoteSmoothing` (phone/network tracker) or `LocalSmoothing` (tracker on this PC) in config (try 0.5-0.7)
 2. Enable Accela filter in OpenTrack
 3. Improve lighting for webcam-based tracking
 

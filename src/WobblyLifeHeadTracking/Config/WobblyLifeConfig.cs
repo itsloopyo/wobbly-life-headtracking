@@ -20,7 +20,8 @@ namespace WobblyLifeHeadTracking.Config
         public ConfigEntry<float> PitchSensitivity { get; }
         public ConfigEntry<float> RollSensitivity { get; }
 
-        public ConfigEntry<float> SmoothingFactor { get; }
+        public ConfigEntry<float> LocalSmoothing { get; }
+        public ConfigEntry<float> RemoteSmoothing { get; }
 
         public ConfigEntry<bool> EnableOnStartup { get; }
         public ConfigEntry<KeyCode> ToggleKey { get; }
@@ -37,7 +38,6 @@ namespace WobblyLifeHeadTracking.Config
         public ConfigEntry<float> PositionLimitY { get; }
         public ConfigEntry<float> PositionLimitYDown { get; }
         public ConfigEntry<float> PositionLimitZ { get; }
-        public ConfigEntry<float> PositionSmoothing { get; }
 
         public ConfigEntry<bool> DisableInMenus { get; }
         public ConfigEntry<bool> DisableWhenPaused { get; }
@@ -63,8 +63,13 @@ namespace WobblyLifeHeadTracking.Config
             PitchSensitivity = BindFloat("Sensitivity", "PitchSensitivity", 1.0f, 0f, 3f, "Vertical rotation sensitivity multiplier");
             RollSensitivity  = BindFloat("Sensitivity", "RollSensitivity",  1.0f, 0f, 3f, "Tilt rotation sensitivity multiplier");
 
-            SmoothingFactor = BindFloat("Smoothing", "SmoothingFactor", 0f, 0f, 0.95f,
-                "Movement smoothing (0 = none/immediate, higher = smoother but more latency)");
+            // Smoothing covers both rotation and position. The value used is selected per
+            // connection from the packet source address, so a player with a local tracker
+            // and a player on a phone over WiFi each get the setting that suits them.
+            LocalSmoothing  = BindFloat("Smoothing", "LocalSmoothing",  0f, 0f, 1f,
+                "Smoothing applied when the tracker runs on this machine (loopback). 0 = no smoothing, 1 = heavy.");
+            RemoteSmoothing = BindFloat("Smoothing", "RemoteSmoothing", 0.15f, 0f, 1f,
+                "Smoothing applied when the tracker is a remote device on the network. 0 = no smoothing, 1 = heavy.");
 
             EnableOnStartup   = config.Bind("Controls", "EnableOnStartup",   true,             "Enable head tracking when game starts");
             ToggleKey         = config.Bind("Controls", "ToggleKey",         KeyCode.End,      "Key to toggle head tracking on/off");
@@ -82,7 +87,6 @@ namespace WobblyLifeHeadTracking.Config
             PositionLimitY       = BindFloat("Position", "LimitY",        0.15f, 0f,   1f, "Maximum upward vertical displacement in meters");
             PositionLimitYDown   = BindFloat("Position", "LimitYDown",    0.05f, 0f, 0.5f, "Maximum downward vertical displacement in meters");
             PositionLimitZ       = BindFloat("Position", "LimitZ",        0.40f, 0f,   1f, "Maximum depth displacement in meters");
-            PositionSmoothing    = BindFloat("Position", "Smoothing",     0.15f, 0f, 0.95f, "Position smoothing (0 = instant, higher = smoother but more latency)");
 
             DisableInMenus    = config.Bind("GameState", "DisableInMenus",    true, "Automatically disable head tracking in menus and non-gameplay scenes");
             DisableWhenPaused = config.Bind("GameState", "DisableWhenPaused", true, "Automatically disable head tracking when the game is paused");
@@ -105,7 +109,8 @@ namespace WobblyLifeHeadTracking.Config
             PositionLimitYDown.Value,
             PositionLimitZ.Value,
             0.10f,
-            PositionSmoothing.Value,
+            LocalSmoothing.Value,
+            RemoteSmoothing.Value,
             invertX: true, invertY: false, invertZ: true
         );
     }

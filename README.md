@@ -107,45 +107,75 @@ The nav-cluster keys are configurable in the config file; the chord alternatives
 
 The mod creates a config file at `BepInEx/config/com.cameraunlock.wobblylife.headtracking.cfg` on first run. Edit it to customize:
 
+A comment has to sit on its own line. BepInEx splits each line at the first `=`
+and takes everything after it as the value, so a trailing `# note` becomes part
+of the value, the conversion fails, and the entry silently keeps its default -
+the only trace is a line in `BepInEx/LogOutput.log`. Put explanations above the
+key, never after it.
+
 ```ini
 [Network]
-Player1Port = 4242               # UDP port for Player 1 (1024-65535)
-Player2Port = 4243               # UDP port for Player 2
-Player3Port = 4244               # UDP port for Player 3
-Player4Port = 4245               # UDP port for Player 4
+# UDP port for Player 1 (1024-65535)
+Player1Port = 4242
+# UDP port for Player 2
+Player2Port = 4243
+# UDP port for Player 3
+Player3Port = 4244
+# UDP port for Player 4
+Player4Port = 4245
 
 [Sensitivity]
-YawSensitivity = 1.0             # Horizontal rotation (0.0-3.0)
-PitchSensitivity = 1.0           # Vertical rotation (0.0-3.0)
-RollSensitivity = 1.0            # Head tilt (0.0-3.0)
+# Horizontal rotation (0.0-3.0)
+YawSensitivity = 1.0
+# Vertical rotation (0.0-3.0)
+PitchSensitivity = 1.0
+# Head tilt (0.0-3.0)
+RollSensitivity = 1.0
 
 [Smoothing]
-SmoothingFactor = 0.0            # 0 = responsive, 0.95 = heavy (adds latency)
+# Smoothing when the tracker runs on this machine (0.0-1.0)
+LocalSmoothing = 0.0
+# Smoothing when the tracker is a remote network device (0.0-1.0)
+RemoteSmoothing = 0.15
 
 [General]
-WorldSpaceYaw = true             # true = horizon-locked yaw (default); false = camera-local
+# true = horizon-locked yaw (default); false = camera-local
+WorldSpaceYaw = true
 
 [Controls]
 EnableOnStartup = true
 ToggleKey = End
 RecenterKey = Home
 PositionToggleKey = PageUp
-YawModeKey = PageDown            # Toggle world-locked vs camera-local yaw
+# Toggle world-locked vs camera-local yaw
+YawModeKey = PageDown
 
 [Position]
-SensitivityX = 200.0             # Lateral sensitivity (0.0-500.0)
-SensitivityY = 200.0             # Vertical sensitivity (0.0-500.0)
-SensitivityZ = 2.0               # Depth sensitivity (0.0-5.0)
-LimitX = 0.30                    # Max lateral offset in meters
-LimitY = 0.15                    # Max upward offset in meters
-LimitYDown = 0.05                # Max downward offset in meters
-LimitZ = 0.40                    # Max depth offset in meters
-Smoothing = 0.15                 # Position smoothing (0.0-0.95)
+# Lateral sensitivity (0.0-5.0)
+SensitivityX = 1.0
+# Vertical sensitivity (0.0-5.0)
+SensitivityY = 1.0
+# Depth sensitivity (0.0-5.0)
+SensitivityZ = 1.0
+# Max lateral offset in meters
+LimitX = 0.30
+# Max upward offset in meters
+LimitY = 0.15
+# Max downward offset in meters
+LimitYDown = 0.05
+# Max depth offset in meters
+LimitZ = 0.40
 
 [GameState]
 DisableInMenus = true
 DisableWhenPaused = true
 ```
+
+Smoothing covers both rotation and position. Which of the two values applies is
+decided per connection from the packet source address: a tracker running on this
+PC uses `LocalSmoothing`, a phone or other network device uses `RemoteSmoothing`.
+Each player is judged independently, and switching takes effect without
+restarting the game.
 
 ## Troubleshooting
 
@@ -161,8 +191,11 @@ DisableWhenPaused = true
 - Press **End** to enable tracking, **Home** to recenter
 - Check firewall isn't blocking UDP port 4242
 
+**A config edit had no effect:**
+- Make sure nothing follows the value on the line. A trailing `# comment` is read as part of the value, the entry falls back to its default, and the game gives no sign of it. `BepInEx/LogOutput.log` records the failed conversion.
+
 **Camera jittering:**
-- Increase `SmoothingFactor` in config (try 0.3-0.5)
+- Increase `RemoteSmoothing` (phone/network tracker) or `LocalSmoothing` (tracker on this PC) in config (try 0.3-0.5), with nothing after the value on the line
 - Improve lighting for webcam tracking
 - Reduce sensitivity in your tracking software
 
