@@ -111,7 +111,7 @@ namespace WobblyLifeHeadTracking.Config
             0.10f,
             LocalSmoothing.Value,
             RemoteSmoothing.Value,
-            invertX: true, invertY: false, invertZ: true
+            invertX: true, invertY: false, invertZ: false
         );
     }
 }
