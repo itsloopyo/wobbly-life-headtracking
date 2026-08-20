@@ -25,7 +25,6 @@ namespace WobblyLifeHeadTracking.Config
 
         public ConfigEntry<bool> EnableOnStartup { get; }
         public ConfigEntry<KeyCode> ToggleKey { get; }
-        public ConfigEntry<KeyCode> RecenterKey { get; }
         public ConfigEntry<KeyCode> PositionToggleKey { get; }
         public ConfigEntry<KeyCode> YawModeKey { get; }
 
@@ -73,7 +72,6 @@ namespace WobblyLifeHeadTracking.Config
 
             EnableOnStartup   = config.Bind("Controls", "EnableOnStartup",   true,             "Enable head tracking when game starts");
             ToggleKey         = config.Bind("Controls", "ToggleKey",         KeyCode.End,      "Key to toggle head tracking on/off");
-            RecenterKey       = config.Bind("Controls", "RecenterKey",       KeyCode.Home,     "Key to recenter view to current head position");
             PositionToggleKey = config.Bind("Controls", "PositionToggleKey", KeyCode.PageUp,   "Key to cycle tracking mode (6DOF / rotation only / position only)");
             YawModeKey        = config.Bind("Controls", "YawModeKey",        KeyCode.PageDown, "Key to toggle yaw mode (world-space horizon-locked vs camera-local)");
 

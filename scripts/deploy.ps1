@@ -198,4 +198,3 @@ Write-Host "DLL location: $pluginsPath\WobblyLifeHeadTracking.dll" -ForegroundCo
 Write-Host "" -ForegroundColor Green
 Write-Host "Launch Wobbly Life to test your changes." -ForegroundColor Yellow
 Write-Host "  - Press End to toggle tracking on/off" -ForegroundColor Gray
-Write-Host "  - Press Home to recenter view" -ForegroundColor Gray

@@ -49,7 +49,7 @@ namespace WobblyLifeHeadTracking
             var ports = _config.PlayerPorts;
             Logger.LogInfo($"Multiplayer head tracking: Player 1=port {ports[0]}, Player 2={ports[1]}, Player 3={ports[2]}, Player 4={ports[3]}");
             Logger.LogInfo($"Head tracking is {(_trackingEnabled ? "enabled" : "disabled")} on startup");
-            Logger.LogInfo($"Controls: Toggle=[{_config.ToggleKey.Value}], Recenter=[{_config.RecenterKey.Value}]");
+            Logger.LogInfo($"Controls: Toggle=[{_config.ToggleKey.Value}], CycleMode=[{_config.PositionToggleKey.Value}], YawMode=[{_config.YawModeKey.Value}]");
         }
 
         private void Update()
@@ -61,7 +61,6 @@ namespace WobblyLifeHeadTracking
 
         private void HandleKeyBinds()
         {
-            if (ChordHotkeys.IsActionPressed(_config.RecenterKey.Value, ChordHotkeys.RecenterLetter)) RecenterView();
             if (ChordHotkeys.IsActionPressed(_config.ToggleKey.Value, ChordHotkeys.ToggleLetter)) ToggleTracking();
             if (ChordHotkeys.IsActionPressed(_config.PositionToggleKey.Value, ChordHotkeys.PositionLetter)) CycleTrackingMode();
             if (ChordHotkeys.IsActionPressed(_config.YawModeKey.Value, ChordHotkeys.FourthToggleLetter)) ToggleYawMode();
@@ -179,18 +178,6 @@ namespace WobblyLifeHeadTracking
         public void ToggleTracking()
         {
             SetTrackingEnabled(!_trackingEnabled);
-        }
-
-        public void RecenterView()
-        {
-            if (_cameraController != null && _cameraController.IsAnyPlayerReceiving())
-            {
-                _cameraController.RecenterAll();
-            }
-            else
-            {
-                Logger.LogWarning("Cannot recenter - no tracking data available");
-            }
         }
     }
 }

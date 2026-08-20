@@ -202,11 +202,6 @@ namespace WobblyLifeHeadTracking.Camera
             ResetTracking();
         }
 
-        public void RecenterAll()
-        {
-            _tracking.Recenter();
-        }
-
         public bool IsAnyPlayerReceiving()
         {
             return _initialized && _tracking.IsAnyReceiving;

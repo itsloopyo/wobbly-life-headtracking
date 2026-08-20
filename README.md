@@ -71,7 +71,7 @@ No special hardware needed - OpenTrack's built-in **neuralnet tracker** uses any
 2. Select your webcam in the tracker settings
 3. Set output to **UDP over network** (`127.0.0.1:4242`)
 4. Start tracking before launching the game
-5. Recenter in OpenTrack via its hotkey, and press **Home** in-game to recenter the mod as needed
+5. Centre it with OpenTrack's Center bind once you are seated normally
 
 ### Phone App Setup
 
@@ -89,10 +89,11 @@ Two equivalent binding sets - use whichever your keyboard has:
 
 | Action              | Nav-cluster | Chord           |
 |---------------------|-------------|-----------------|
-| Recenter            | `Home`      | `Ctrl+Shift+T`  |
 | Toggle tracking     | `End`       | `Ctrl+Shift+Y`  |
 | Cycle tracking mode | `Page Up`   | `Ctrl+Shift+G`  |
 | Toggle yaw mode     | `Page Down` | `Ctrl+Shift+H`  |
+
+There is no recenter key. The mod applies the pose your tracker sends as-is, so centre it in the tracker app: OpenTrack's Center bind, or the CENTER button in Headcam.
 
 `Page Up` / `Ctrl+Shift+G` cycles tracking mode:
 
@@ -145,7 +146,6 @@ WorldSpaceYaw = true
 [Controls]
 EnableOnStartup = true
 ToggleKey = End
-RecenterKey = Home
 PositionToggleKey = PageUp
 # Toggle world-locked vs camera-local yaw
 YawModeKey = PageDown
@@ -188,7 +188,7 @@ restarting the game.
 **No tracking response:**
 - Verify OpenTrack is running and outputting data
 - Check UDP port matches (default 4242)
-- Press **End** to enable tracking, **Home** to recenter
+- Press **End** to enable tracking; if the view is off-centre, centre it in your tracker app
 - Check firewall isn't blocking UDP port 4242
 
 **A config edit had no effect:**

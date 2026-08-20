@@ -30,7 +30,7 @@ set "FRAMEWORK_TYPE=BepInEx"
 set "BEPINEX_ARCH=x64"
 set "BEPINEX_VENDOR_ZIP_NAME="
 set "BEPINEX_SUBFOLDER="
-set "MOD_CONTROLS=Controls:&echo   Home / Ctrl+Shift+T    - Recenter head tracking&echo   End  / Ctrl+Shift+Y    - Toggle head tracking on/off&echo   PgUp / Ctrl+Shift+G    - Cycle tracking mode&echo   PgDn / Ctrl+Shift+H    - Toggle yaw mode (world/local)"
+set "MOD_CONTROLS=Controls:&echo   End  / Ctrl+Shift+Y    - Toggle head tracking on/off&echo   PgUp / Ctrl+Shift+G    - Cycle tracking mode&echo   PgDn / Ctrl+Shift+H    - Toggle yaw mode (world/local)"
 :: --- END CONFIG BLOCK ---
 
 call :detect_yes_flag %*

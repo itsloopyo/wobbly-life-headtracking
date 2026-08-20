@@ -80,17 +80,17 @@ For couch co-op, each player needs their own tracker on a separate port. Ports a
 
 | Action | Nav cluster | Chord |
 |--------|-------------|-------|
-| Recenter view | **Home** | **Ctrl+Shift+T** |
 | Toggle head tracking | **End** | **Ctrl+Shift+Y** |
 | Cycle tracking mode | **Page Up** | **Ctrl+Shift+G** |
 | Toggle yaw mode | **Page Down** | **Ctrl+Shift+H** |
+
+There is no recenter key. The mod applies the pose your tracker sends as-is, so centre it in the tracker app: OpenTrack's Center bind, or the CENTER button in Headcam.
 
 ## Verifying Installation
 
 1. Start OpenTrack and enable tracking
 2. Launch Wobbly Life
 3. Once in-game, move your head - the camera should follow
-4. Press **Home** to recenter if needed
 
 Check `BepInEx/LogOutput.log` for status messages.
 
@@ -121,7 +121,6 @@ WorldSpaceYaw = true
 [Controls]
 EnableOnStartup = true
 ToggleKey = End
-RecenterKey = Home
 PositionToggleKey = PageUp
 YawModeKey = PageDown
 
@@ -156,7 +155,7 @@ the value is picked per connection from the packet source address.
 1. Verify OpenTrack is running and tracking is active
 2. Check UDP output is set to `127.0.0.1:4242`
 3. Press **End** to make sure tracking is enabled
-4. Press **Home** to recenter
+4. If the view is off-centre, centre it in your tracker app
 5. Check Windows Firewall isn't blocking UDP on port 4242
 
 ### Camera jittering
