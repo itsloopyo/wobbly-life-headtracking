@@ -2,8 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- Ship the licence text of every third-party binary the release ZIPs carry, as
+  `licenses/` in both the installer and Nexus ZIPs and reproduced verbatim in
+  THIRD-PARTY-NOTICES.md. Previously the ZIPs deployed `CameraUnlock.Core.dll`
+  with no notice for its copyright holder, and bundled BepInEx's archive, which
+  also contains HarmonyX, Mono.Cecil and MonoMod, with only BepInEx's own LGPL
+  text beside it.
+
 ### Changed
 
+- Packaging now builds the Nexus ZIP that `release.yml` expects, and refuses to
+  produce either ZIP when a required licence file is missing rather than warning
+  and carrying on.
+- Credit HarmonyX rather than Harmony for the `0Harmony.dll` that BepInEx ships,
+  and credit MonoMod and Mono.Cecil alongside it.
 - Removed recentring from the mod. The `Home` / `Ctrl+Shift+T` hotkey and the
   `[Controls] RecenterKey` entry are gone and the tracker pose is applied as
   sent. Every tracker app centres itself, so a mod-side centre sat in series
