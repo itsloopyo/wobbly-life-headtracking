@@ -7,9 +7,9 @@
 
 # Wobbly Life Head Tracking
 
-An unofficial BepInEx plugin that adds OpenTrack head tracking to Wobbly Life, decoupling look from aim and supporting up to 4 players in couch co-op without any VR hardware.
+![Wobbly Life running with this mod](https://raw.githubusercontent.com/itsloopyo/wobbly-life-headtracking/main/assets/readme-clip.gif)
 
-<!-- ![Mod GIF](https://raw.githubusercontent.com/itsloopyo/wobbly-life-headtracking/main/assets/readme-clip.gif) -->
+An unofficial BepInEx plugin that adds OpenTrack head tracking to Wobbly Life, decoupling look from aim and supporting up to 4 players in couch co-op without any VR hardware.
 
 ## Features
 

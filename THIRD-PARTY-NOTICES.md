@@ -9,8 +9,9 @@ verbatim, and this file ships at the root of every release ZIP we publish.
 Naming a licence is not reproducing it, so every text below also ships as its own
 file under `licenses/` in both release ZIPs, beside the binary it covers.
 
-Nothing in this repository is derived from, or redistributes any part of,
-Wobbly Life.
+This repository contains no game code, no extracted assets and no data files
+from Wobbly Life. It does carry one short clip of captured gameplay footage,
+described under "Wobbly Life" below.
 
 | Component | Version | Licence | How it ships |
 |-----------|---------|---------|--------------|
@@ -739,9 +740,21 @@ mod applies to, which is nominative use and not a claim of any right in them.
 This project is an unofficial, fan-made modification. It is not affiliated
 with, endorsed by, or sponsored by the game's developers, its publishers, its
 engine vendor, or any other rights holder. It redistributes no game code, no
-game assets and no proprietary DLLs, and it requires a legitimately purchased
-copy of the game. Any engine structure offsets, function addresses or byte
-patterns referenced in the source were derived by the authors through
-independent analysis of a legitimately owned copy. They are factual
-measurements recorded as numbers; no decompiled or disassembled game code is
-stored in this repository.
+extracted assets, no data files and no proprietary DLLs, and it requires a
+legitimately purchased copy of the game.
+
+`assets/readme-clip.gif` is roughly ten seconds of ordinary gameplay, captured
+by the authors from a legitimately owned copy and embedded at the top of
+`README.md`. It is the game's own audiovisual work and its copyright rests with
+Rubber Band Games; the MIT licence covering this project does not extend to it.
+It is present so a reader can see what the mod does, which is how a mod page
+normally presents itself. It lives in the repository only: the packaging script
+copies `README.md`, `LICENSE`, `CHANGELOG.md` and this file, never `assets/`, so
+the clip ships in neither the installer ZIP nor the Nexus ZIP. The README
+references it by absolute URL so the image still resolves for someone reading
+the copy inside a ZIP. We will take it down on request from a rights holder.
+
+Any engine structure offsets, function addresses or byte patterns referenced in
+the source were derived by the authors through independent analysis of a
+legitimately owned copy. They are factual measurements recorded as numbers; no
+decompiled or disassembled game code is stored in this repository.
