@@ -269,7 +269,10 @@ MIT - see [LICENSE](LICENSE). Copyright (c) 2026 itsloopyo.
 - [RubberBandGames](https://rubberbandgames.itch.io/) - Wobbly Life
 - [BepInEx](https://github.com/BepInEx/BepInEx) - Unity modding framework
 - [OpenTrack](https://github.com/opentrack/opentrack) - Head tracking software
-- [Harmony](https://github.com/pardeike/Harmony) - Runtime patching library
+- [HarmonyX](https://github.com/BepInEx/HarmonyX) - Runtime patching library shipped inside BepInEx, a fork of [Harmony](https://github.com/pardeike/Harmony) by Andreas Pardeike
+- [MonoMod](https://github.com/MonoMod/MonoMod) and [Mono.Cecil](https://github.com/jbevain/cecil) - IL tooling HarmonyX is built on
+
+Full licence texts for everything the release ZIPs redistribute are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and ship as separate files under `licenses/` in both ZIPs.
 
 ## Disclaimer
 

@@ -552,6 +552,7 @@ namespace UnityEngine.SceneManagement {
         public string name { get; }
         public int buildIndex { get; }
         public bool isLoaded { get; }
+        public bool IsValid() => false;
     }
     public enum LoadSceneMode { Single, Additive }
     public static class SceneManager {
