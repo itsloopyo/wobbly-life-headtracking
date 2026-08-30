@@ -63,6 +63,7 @@ $projectDir = Split-Path -Parent $scriptDir
 $csprojPath = Join-Path $projectDir "src\WobblyLifeHeadTracking\WobblyLifeHeadTracking.csproj"
 $pluginPath = Join-Path $projectDir "src\WobblyLifeHeadTracking\WobblyLifeHeadTrackingPlugin.cs"
 $pixiPath = Join-Path $projectDir "pixi.toml"
+$installCmdPath = Join-Path $projectDir "scripts\install.cmd"
 
 Import-Module (Join-Path $projectDir "cameraunlock-core\powershell\ReleaseWorkflow.psm1") -Force
 
@@ -113,6 +114,16 @@ function Set-PixiVersion {
     $content = Get-Content $pixiPath -Raw
     $content = $content -replace 'version\s*=\s*"[^"]+"', "version = `"$NewVersion`""
     $content | Set-Content $pixiPath -NoNewline
+}
+
+# install.cmd's MOD_VERSION is what the install writes into the launcher's
+# state file, which is where the launcher looks to spot a stale install.
+function Set-InstallCmdVersion {
+    param([string]$NewVersion)
+    $content = Get-Content $installCmdPath -Raw
+    if ($content -notmatch 'set "MOD_VERSION=[^"]+"') { throw "MOD_VERSION line not found in $installCmdPath" }
+    $content = $content -replace 'set "MOD_VERSION=[^"]+"', "set `"MOD_VERSION=$NewVersion`""
+    $content | Set-Content $installCmdPath -NoNewline
 }
 
 Write-Host "=== Wobbly Life Head Tracking Release ===" -ForegroundColor Cyan
@@ -207,6 +218,10 @@ Set-PluginVersion $Version
 Write-Host "Updating pixi.toml version to $Version..." -ForegroundColor Cyan
 Set-PixiVersion $Version
 
+# Step 4b: Update install.cmd MOD_VERSION
+Write-Host "Updating install.cmd MOD_VERSION to $Version..." -ForegroundColor Cyan
+Set-InstallCmdVersion $Version
+
 # Step 5: Build release to verify version compiles
 Write-Host "Building release..." -ForegroundColor Cyan
 & pixi run build
@@ -217,7 +232,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Step 6: Commit
 Write-Host "Committing version change..." -ForegroundColor Cyan
-git add $csprojPath $pluginPath $pixiPath $changelogPath
+git add $csprojPath $pluginPath $pixiPath $installCmdPath $changelogPath
 git commit -m "Release v$Version"
 
 # Step 7: Create tag
