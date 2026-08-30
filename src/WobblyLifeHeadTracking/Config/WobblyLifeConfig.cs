@@ -98,17 +98,24 @@ namespace WobblyLifeHeadTracking.Config
             RollSensitivity.Value
         );
 
+        // Every slot is named. The constructor takes ten consecutive floats, so a
+        // positional call binds silently to whatever arity the signature happens to
+        // have: the smoothing split already turned one such call site into a
+        // limit-fed-as-smoothing bug fleet-wide.
+        //
+        // limitZBack has no config key: leaning back only needs enough room to clear
+        // the player model, so it stays on the core default while LimitZ is tunable.
         public PositionSettings PositionSettingsFromConfig => new PositionSettings(
-            PositionSensitivityX.Value,
-            PositionSensitivityY.Value,
-            PositionSensitivityZ.Value,
-            PositionLimitX.Value,
-            PositionLimitY.Value,
-            PositionLimitYDown.Value,
-            PositionLimitZ.Value,
-            0.10f,
-            LocalSmoothing.Value,
-            RemoteSmoothing.Value,
+            sensitivityX: PositionSensitivityX.Value,
+            sensitivityY: PositionSensitivityY.Value,
+            sensitivityZ: PositionSensitivityZ.Value,
+            limitX: PositionLimitX.Value,
+            limitY: PositionLimitY.Value,
+            limitYDown: PositionLimitYDown.Value,
+            limitZ: PositionLimitZ.Value,
+            limitZBack: 0.10f,
+            localSmoothing: LocalSmoothing.Value,
+            remoteSmoothing: RemoteSmoothing.Value,
             invertX: true, invertY: false, invertZ: false
         );
     }
