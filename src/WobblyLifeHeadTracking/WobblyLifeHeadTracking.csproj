@@ -24,7 +24,7 @@
     </ProjectReference>
   </ItemGroup>
 
-  <!-- Reference DLLs from lib/ folder (populated by setup-libs.ps1, overridable via -p:UnityEnginePath=) -->
+  <!-- Reference DLLs from libs/ (populated by `pixi run setup`, overridable via -p:UnityEnginePath=) -->
   <PropertyGroup>
     <UnityEnginePath Condition="'$(UnityEnginePath)' == ''">$(MSBuildProjectDirectory)\libs</UnityEnginePath>
     <LibPath>$(UnityEnginePath)</LibPath>

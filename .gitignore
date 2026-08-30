@@ -2,7 +2,8 @@
 bin/
 obj/
 
-# Game reference DLLs (copied at build time, NOT UnityStubs.cs)
+# Generated Unity reference stubs and loader DLLs. The stub SOURCE lives in
+# cameraunlock-core/csharp/stubs, not here.
 src/*/libs/*.dll
 lib/
 

@@ -7,8 +7,13 @@ platforms = ["win-64"]
 
 [tasks]
 sync = "git submodule update --remote cameraunlock-core"
-setup-libs = "powershell -ExecutionPolicy Bypass -File scripts/setup-libs.ps1"
-restore = { cmd = "dotnet restore src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj", depends-on = ["setup-libs"] }
+# BepInEx.dll and 0Harmony.dll out of the committed vendor zip.
+setup-loader = "powershell -ExecutionPolicy Bypass -File scripts/setup-libs.ps1"
+# Unity reference stubs, compiled from the shared sources in the core submodule so
+# every mod builds against one copy of them. Runs after setup-loader, which clears
+# libs/ before repopulating it.
+setup = { cmd = "powershell -ExecutionPolicy Bypass -File cameraunlock-core/csharp/stubs/build-unity-stubs.ps1 -OutputPath src/WobblyLifeHeadTracking/libs -TargetFramework net472", depends-on = ["setup-loader"] }
+restore = { cmd = "dotnet restore src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj", depends-on = ["setup"] }
 build = { cmd = "dotnet build src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj -c Release", depends-on = ["restore"] }
 # Checks that every member reference the build emits resolves against the
 # assemblies it binds to at runtime. Stub/engine shape drift (a property
