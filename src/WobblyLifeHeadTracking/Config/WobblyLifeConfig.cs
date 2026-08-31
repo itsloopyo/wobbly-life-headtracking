@@ -65,9 +65,9 @@ namespace WobblyLifeHeadTracking.Config
             // Smoothing covers both rotation and position. The value used is selected per
             // connection from the packet source address, so a player with a local tracker
             // and a player on a phone over WiFi each get the setting that suits them.
-            LocalSmoothing  = BindFloat("Smoothing", "LocalSmoothing",  0f, 0f, 1f,
+            LocalSmoothing  = BindFloat("Smoothing", "LocalSmoothing", CameraUnlock.Core.Math.SmoothingUtils.DefaultLocalSmoothing, 0f, 1f,
                 "Smoothing applied when the tracker runs on this machine (loopback). 0 = no smoothing, 1 = heavy.");
-            RemoteSmoothing = BindFloat("Smoothing", "RemoteSmoothing", 0.15f, 0f, 1f,
+            RemoteSmoothing = BindFloat("Smoothing", "RemoteSmoothing", CameraUnlock.Core.Math.SmoothingUtils.DefaultRemoteSmoothing, 0f, 1f,
                 "Smoothing applied when the tracker is a remote device on the network. 0 = no smoothing, 1 = heavy.");
 
             EnableOnStartup   = config.Bind("Controls", "EnableOnStartup",   true,             "Enable head tracking when game starts");
@@ -81,10 +81,10 @@ namespace WobblyLifeHeadTracking.Config
             PositionSensitivityX = BindFloat("Position", "SensitivityX", 1.0f, 0f, 5f, "Lateral (left/right) position sensitivity multiplier");
             PositionSensitivityY = BindFloat("Position", "SensitivityY", 1.0f, 0f, 5f, "Vertical (up/down) position sensitivity multiplier");
             PositionSensitivityZ = BindFloat("Position", "SensitivityZ", 1.0f, 0f, 5f, "Depth (forward/back) position sensitivity multiplier");
-            PositionLimitX       = BindFloat("Position", "LimitX",        0.30f, 0f,   1f, "Maximum lateral displacement in meters");
+            PositionLimitX       = BindFloat("Position", "LimitX", PositionSettings.Default.LimitX, 0f,   1f, "Maximum lateral displacement in meters");
             PositionLimitY       = BindFloat("Position", "LimitY",        0.15f, 0f,   1f, "Maximum upward vertical displacement in meters");
             PositionLimitYDown   = BindFloat("Position", "LimitYDown",    0.05f, 0f, 0.5f, "Maximum downward vertical displacement in meters");
-            PositionLimitZ       = BindFloat("Position", "LimitZ",        0.40f, 0f,   1f, "Maximum depth displacement in meters");
+            PositionLimitZ       = BindFloat("Position", "LimitZ", PositionSettings.Default.LimitZ, 0f,   1f, "Maximum depth displacement in meters");
 
             DisableInMenus    = config.Bind("GameState", "DisableInMenus",    true, "Automatically disable head tracking in menus and non-gameplay scenes");
             DisableWhenPaused = config.Bind("GameState", "DisableWhenPaused", true, "Automatically disable head tracking when the game is paused");
@@ -113,7 +113,7 @@ namespace WobblyLifeHeadTracking.Config
             limitY: PositionLimitY.Value,
             limitYDown: PositionLimitYDown.Value,
             limitZ: PositionLimitZ.Value,
-            limitZBack: 0.10f,
+            limitZBack: PositionSettings.Default.LimitZBack,
             localSmoothing: LocalSmoothing.Value,
             remoteSmoothing: RemoteSmoothing.Value,
             invertX: true, invertY: false, invertZ: false
