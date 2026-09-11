@@ -1,0 +1,86 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <!-- Same assembly name and plugin GUID as the Mono build. Only one of the two
+         is ever deployed into a given install, and matching them keeps the config
+         file at BepInEx/config/com.cameraunlock.wobblylife.headtracking.cfg on
+         both stores, so a player's settings carry over. -->
+    <AssemblyName>WobblyLifeHeadTracking</AssemblyName>
+    <RootNamespace>WobblyLifeHeadTracking</RootNamespace>
+    <Version>0.0.0</Version>
+    <LangVersion>10.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <OutputType>Library</OutputType>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <Authors>CameraUnlock Mods</Authors>
+    <Description>Head tracking mod for the IL2CPP (Xbox Game Pass) build of Wobbly Life using CameraUnlock.Core</Description>
+    <Copyright>Copyright (c) 2026 itsloopyo</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- NU1702: CameraUnlock.Core.Unity targets .NET Framework. BepInEx 6's .NET 6
+         host loads it as-is, which is how shadows-of-doubt-headtracking consumes
+         it too. -->
+    <NoWarn>$(NoWarn);NU1702</NoWarn>
+  </PropertyGroup>
+
+  <!-- Unity references for this build are the PUBLISHED reference assemblies staged
+       by scripts/setup-libs-il2cpp.ps1, not the generated stubs the Mono build uses.
+       Il2CppInterop generates its assemblies to the real Unity shape, and the stubs
+       differ from it in ways that only surface at load time - in the stubs
+       UnityEngine.dll declares Quaternion, where real Unity forwards it to
+       UnityEngine.CoreModule, so a Core.Unity built against them dies with
+       TypeLoadException the moment BepInEx loads the plugin. Overridable for
+       validation, as the Mono project's path is. -->
+  <PropertyGroup>
+    <UnityEnginePath Condition="'$(UnityEngineIl2CppPath)' != ''">$(UnityEngineIl2CppPath)</UnityEnginePath>
+    <UnityEnginePath Condition="'$(UnityEngineIl2CppPath)' == ''">$(MSBuildProjectDirectory)\libs</UnityEnginePath>
+    <!-- Read by Directory.Build.targets to scope its submodule overrides to this
+         consumer, leaving the Mono build's copy of them alone. -->
+    <CameraUnlockIl2Cpp>true</CameraUnlockIl2Cpp>
+  </PropertyGroup>
+
+  <!-- Each reference is pinned to one target framework. Neither project
+       multi-targets anything net6.0 can consume, so without this MSBuild builds
+       every flavour they declare; the pair chosen also keeps this build's output
+       directories apart from the Mono build's, which compiles the same two
+       projects against different Unity references. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\cameraunlock-core\csharp\src\CameraUnlock.Core\CameraUnlock.Core.csproj"
+                      SetTargetFramework="TargetFramework=netstandard2.0">
+      <AdditionalProperties>CameraUnlockIl2Cpp=true</AdditionalProperties>
+    </ProjectReference>
+    <ProjectReference Include="..\..\cameraunlock-core\csharp\src\CameraUnlock.Core.Unity\CameraUnlock.Core.Unity.csproj"
+                      SetTargetFramework="TargetFramework=net48">
+      <AdditionalProperties>CameraUnlockIl2Cpp=true;UnityEnginePath=$(UnityEnginePath)</AdditionalProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Everything the IL2CPP host needs comes from NuGet, never from the game
+       install: the build has to succeed on a machine that does not own the game.
+
+       The BepInEx reference is be.753 while vendor/bepinex-il2cpp ships be.785.
+       Later BE builds declare a Samboy063.Cpp2IL.Core version that was never
+       published, so restoring them fails outright. Only BasePlugin and
+       ClassInjector are used from this package and both are unchanged between the
+       two builds; Cpp2IL is the loader's own business at runtime, not the
+       plugin's. -->
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.753" />
+    <PackageReference Include="UnityEngine.Modules" Version="2022.3.62" />
+    <PackageReference Include="Il2CppInterop.ReferenceLibs" Version="1.0.0" />
+  </ItemGroup>
+
+  <!-- The ini surface is single-sourced with the Mono build. Two copies of the
+       config binding would drift, and the README and Nexus page are both written
+       against it. -->
+  <ItemGroup>
+    <Compile Include="..\WobblyLifeHeadTracking\Config\WobblyLifeConfig.cs"
+             Link="Config\WobblyLifeConfig.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="libs\**" />
+    <None Remove="libs\**" />
+  </ItemGroup>
+</Project>

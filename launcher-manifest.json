@@ -6,28 +6,55 @@
     "game_id": "wobbly-life"
   },
   "strategy": "BepInEx5",
-  "delivery_mode": "manifest",
+  "delivery_mode": "manifest_variants",
 
-  "loader": {
-    "archives": [
-      { "source": "vendor/bepinex/BepInEx_win_x64.zip", "dest": "", "flatten": null }
-    ],
-    "detect": [
-      "BepInEx/core/BepInEx.dll",
-      "BepInEx/core/BepInEx.Core.dll"
-    ],
-    "seed": [
-      {
-        "target": "BepInEx/config/BepInEx.cfg",
-        "content_b64": "W0xvZ2dpbmcuQ29uc29sZV0NCkVuYWJsZWQgPSB0cnVlDQoNCltMb2dnaW5nLkRpc2tdDQpFbmFibGVkID0gdHJ1ZQ0K"
-      }
-    ]
-  },
-
-  "files": [
-    { "source": "plugins/WobblyLifeHeadTracking.dll", "target": "BepInEx/plugins/WobblyLifeHeadTracking.dll" },
-    { "source": "plugins/CameraUnlock.Core.dll", "target": "BepInEx/plugins/CameraUnlock.Core.dll" },
-    { "source": "plugins/CameraUnlock.Core.Unity.dll", "target": "BepInEx/plugins/CameraUnlock.Core.Unity.dll" }
+  "variants": [
+    {
+      "id": "il2cpp",
+      "when": { "file_exists": { "path": "GameAssembly.dll" } },
+      "loader": {
+        "archives": [
+          { "source": "vendor/bepinex-il2cpp/BepInEx_UnityIL2CPP_x64.zip", "dest": "", "flatten": null }
+        ],
+        "detect": [
+          "BepInEx/core/BepInEx.Unity.IL2CPP.dll",
+          "BepInEx/core/Il2CppInterop.Runtime.dll"
+        ],
+        "seed": [
+          {
+            "target": "BepInEx/config/BepInEx.cfg",
+            "content_b64": "W0xvZ2dpbmcuQ29uc29sZV0NCkVuYWJsZWQgPSB0cnVlDQoNCltMb2dnaW5nLkRpc2tdDQpFbmFibGVkID0gdHJ1ZQ0K"
+          }
+        ]
+      },
+      "files": [
+        { "source": "plugins-il2cpp/WobblyLifeHeadTracking.dll", "target": "BepInEx/plugins/WobblyLifeHeadTracking.dll" },
+        { "source": "plugins-il2cpp/CameraUnlock.Core.dll", "target": "BepInEx/plugins/CameraUnlock.Core.dll" },
+        { "source": "plugins-il2cpp/CameraUnlock.Core.Unity.dll", "target": "BepInEx/plugins/CameraUnlock.Core.Unity.dll" }
+      ]
+    },
+    {
+      "id": "mono",
+      "loader": {
+        "archives": [
+          { "source": "vendor/bepinex/BepInEx_win_x64.zip", "dest": "", "flatten": null }
+        ],
+        "detect": [
+          "BepInEx/core/BepInEx.dll"
+        ],
+        "seed": [
+          {
+            "target": "BepInEx/config/BepInEx.cfg",
+            "content_b64": "W0xvZ2dpbmcuQ29uc29sZV0NCkVuYWJsZWQgPSB0cnVlDQoNCltMb2dnaW5nLkRpc2tdDQpFbmFibGVkID0gdHJ1ZQ0K"
+          }
+        ]
+      },
+      "files": [
+        { "source": "plugins/WobblyLifeHeadTracking.dll", "target": "BepInEx/plugins/WobblyLifeHeadTracking.dll" },
+        { "source": "plugins/CameraUnlock.Core.dll", "target": "BepInEx/plugins/CameraUnlock.Core.dll" },
+        { "source": "plugins/CameraUnlock.Core.Unity.dll", "target": "BepInEx/plugins/CameraUnlock.Core.Unity.dll" }
+      ]
+    }
   ],
 
   "runtime_requirements": [],

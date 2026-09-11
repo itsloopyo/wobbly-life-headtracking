@@ -26,6 +26,12 @@ set "BEPINEX_VENDOR_ZIP_NAME="
 set "BEPINEX_SUBFOLDER="
 :: Subfolder under BepInEx\plugins\ to deploy into. Empty lays the DLLs flat.
 set "PLUGIN_SUBFOLDER="
+:: The game ships two incompatible builds. Steam is Mono and takes the BepInEx 5
+:: payload set above; Xbox Game Pass is IL2CPP and takes these instead. The body
+:: picks between them by looking for GameAssembly.dll in the target install.
+set "IL2CPP_VENDOR_DIR_NAME=bepinex-il2cpp"
+set "IL2CPP_VENDOR_ZIP_NAME=BepInEx_UnityIL2CPP_x64.zip"
+set "IL2CPP_PLUGIN_DIR_NAME=plugins-il2cpp"
 :: Post-install help text. `&echo ` starts each further line.
 set "MOD_CONTROLS=Controls:&echo   End  / Ctrl+Shift+Y    - Toggle head tracking on/off&echo   PgUp / Ctrl+Shift+G    - Cycle tracking mode&echo   PgDn / Ctrl+Shift+H    - Toggle yaw mode (world/local)"
 :: --- END CONFIG BLOCK ---

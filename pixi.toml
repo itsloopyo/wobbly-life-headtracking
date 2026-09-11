@@ -14,12 +14,21 @@ setup-loader = "powershell -ExecutionPolicy Bypass -File scripts/setup-libs.ps1"
 # libs/ before repopulating it.
 setup = { cmd = "powershell -ExecutionPolicy Bypass -File cameraunlock-core/csharp/stubs/build-unity-stubs.ps1 -OutputPath src/WobblyLifeHeadTracking/libs -TargetFramework net472", depends-on = ["setup-loader"] }
 restore = { cmd = "dotnet restore src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj", depends-on = ["setup"] }
-build = { cmd = "dotnet build src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj -c Release", depends-on = ["restore"] }
+build-mono = { cmd = "dotnet build src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj -c Release", depends-on = ["restore"] }
+# The Xbox Game Pass copy is an IL2CPP build and needs the BepInEx 6 plugin; the
+# Steam copy is Mono and needs the BepInEx 5 one. Separate projects, separate
+# Unity references (published reference assemblies vs generated stubs - see
+# scripts/setup-libs-il2cpp.ps1), so separate restore/setup/build chains.
+restore-il2cpp = { cmd = "dotnet restore src/WobblyLifeHeadTracking.Il2Cpp/WobblyLifeHeadTracking.Il2Cpp.csproj", depends-on = ["build-mono"] }
+setup-il2cpp = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/setup-libs-il2cpp.ps1", depends-on = ["restore-il2cpp"] }
+build-il2cpp = { cmd = "dotnet build src/WobblyLifeHeadTracking.Il2Cpp/WobblyLifeHeadTracking.Il2Cpp.csproj -c Release", depends-on = ["setup-il2cpp"] }
+# Both payloads, because `install` and `package` both need both.
+build = { depends-on = ["build-mono", "build-il2cpp"] }
 # Checks that every member reference the build emits resolves against the
 # assemblies it binds to at runtime. Stub/engine shape drift (a property
 # declared as a field, or the reverse) compiles cleanly and only fails in
 # game. Needs the game installed; skips and succeeds without it.
-verify-refs = { cmd = "powershell -ExecutionPolicy Bypass -File cameraunlock-core/scripts/verify-assembly-refs.ps1 -GameId wobbly-life -BuildDir src/WobblyLifeHeadTracking/bin/Release", depends-on = ["build"] }
+verify-refs = { cmd = "powershell -ExecutionPolicy Bypass -File cameraunlock-core/scripts/verify-assembly-refs.ps1 -GameId wobbly-life -BuildDir src/WobblyLifeHeadTracking/bin/Release", depends-on = ["build-mono"] }
 build-release = { depends-on = ["build"] }
 install = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 Release", depends-on = ["build"] }
 uninstall = "scripts\\uninstall.cmd"

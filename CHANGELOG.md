@@ -4,6 +4,15 @@
 
 ### Added
 
+- Support for the Xbox Game Pass / Microsoft Store copy of the game. It is a
+  different build from the Steam one - IL2CPP rather than Mono - so it needs a
+  different mod binary and a different version of BepInEx. One download covers
+  both: `install.cmd` and the Lopari launcher each work out which build they are
+  installing into and deploy the matching pair. Own the game on both stores and
+  the installer does both.
+- The mod DLLs for the Game Pass build ship in `plugins-il2cpp/` and its loader
+  in `vendor/bepinex-il2cpp/`, alongside the existing Steam payload. The Nexus
+  archive remains the Mono payload only. Use the installer ZIP for Game Pass.
 - Ship the licence text of every third-party binary the release ZIPs carry, as
   `licenses/` in both the installer and Nexus ZIPs and reproduced verbatim in
   THIRD-PARTY-NOTICES.md. Previously the ZIPs deployed `CameraUnlock.Core.dll`

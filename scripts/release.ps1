@@ -95,17 +95,21 @@ function Get-CurrentVersion {
 # Function to set version in csproj
 function Set-CsprojVersion {
     param([string]$NewVersion)
-    $content = Get-Content $csprojPath -Raw
-    $content = $content -replace '<Version>[^<]+</Version>', "<Version>$NewVersion</Version>"
-    $content | Set-Content $csprojPath -NoNewline
+    foreach ($path in @($csprojPath, (Join-Path $PSScriptRoot '../src/WobblyLifeHeadTracking.Il2Cpp/WobblyLifeHeadTracking.Il2Cpp.csproj'))) {
+        $content = Get-Content $path -Raw
+        $content = $content -replace '<Version>[^<]+</Version>', "<Version>$NewVersion</Version>"
+        $content | Set-Content $path -NoNewline
+    }
 }
 
 # Function to set version in plugin
 function Set-PluginVersion {
     param([string]$NewVersion)
-    $content = Get-Content $pluginPath -Raw
-    $content = $content -replace 'PluginVersion\s*=\s*"[^"]+"', "PluginVersion = `"$NewVersion`""
-    $content | Set-Content $pluginPath -NoNewline
+    foreach ($path in @($pluginPath, (Join-Path $PSScriptRoot '../src/WobblyLifeHeadTracking.Il2Cpp/WobblyLifeHeadTrackingPlugin.cs'))) {
+        $content = Get-Content $path -Raw
+        $content = $content -replace 'PluginVersion\s*=\s*"[^"]+"', "PluginVersion = `"$NewVersion`""
+        $content | Set-Content $path -NoNewline
+    }
 }
 
 # Function to set version in pixi.toml

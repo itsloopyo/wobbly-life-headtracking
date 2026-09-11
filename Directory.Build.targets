@@ -1,0 +1,26 @@
+<Project>
+  <!-- Overrides for the cameraunlock-core projects when the IL2CPP plugin is the
+       one consuming them. Everything here is gated on CameraUnlockIl2Cpp, which
+       only WobblyLifeHeadTracking.Il2Cpp.csproj sets, so the Mono plugin's build
+       of the same submodule projects is untouched.
+
+       The two consumers also pin different target frameworks (net472 for Mono,
+       the ones below for IL2CPP). That is not a preference: one shared TFM would
+       put two builds with different Unity references in the same obj/bin folder,
+       and which one survived would depend on build order. -->
+  <PropertyGroup Condition="'$(CameraUnlockIl2Cpp)' == 'true' And '$(MSBuildProjectName)' == 'CameraUnlock.Core'">
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CameraUnlockIl2Cpp)' == 'true' And '$(MSBuildProjectName)' == 'CameraUnlock.Core.Unity'">
+    <TargetFrameworks>net48</TargetFrameworks>
+  </PropertyGroup>
+
+  <!-- UnityEngine.UI (UGUI) ships only inside a built Unity game and is not
+       redistributable, so setup-libs-il2cpp.ps1 cannot vendor it. These are its
+       only consumers in the submodule and the mod uses none of them. -->
+  <ItemGroup Condition="'$(CameraUnlockIl2Cpp)' == 'true' And '$(MSBuildProjectName)' == 'CameraUnlock.Core.Unity'">
+    <Reference Remove="UnityEngine.UI" />
+    <Compile Remove="Utilities\CrosshairUtility.cs" />
+    <Compile Remove="Utilities\GameUIFinder.cs" />
+  </ItemGroup>
+</Project>

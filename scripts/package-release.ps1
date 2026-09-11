@@ -18,6 +18,19 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectDir = Split-Path -Parent $scriptDir
 
+$monoProject = [xml](Get-Content (Join-Path $projectDir 'src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj') -Raw)
+$il2cppProject = [xml](Get-Content (Join-Path $projectDir 'src/WobblyLifeHeadTracking.Il2Cpp/WobblyLifeHeadTracking.Il2Cpp.csproj') -Raw)
+$version = $monoProject.SelectSingleNode('//Version').InnerText
+if ($il2cppProject.SelectSingleNode('//Version').InnerText -ne $version) {
+    throw 'Mono and IL2CPP project versions do not match.'
+}
+foreach ($name in @('WobblyLifeHeadTracking', 'WobblyLifeHeadTracking.Il2Cpp')) {
+    $plugin = Get-Content (Join-Path $projectDir "src/$name/WobblyLifeHeadTrackingPlugin.cs") -Raw
+    if ([regex]::Match($plugin, 'PluginVersion\s*=\s*"([^"]+)"').Groups[1].Value -ne $version) {
+        throw "$name plugin version does not match project version $version."
+    }
+}
+
 # Every file that must reach a user alongside a binary we redistribute.
 # ZIP-relative path => repo-relative source.
 $RequiredNotices = [ordered]@{
@@ -30,12 +43,49 @@ $RequiredNotices = [ordered]@{
     'licenses/Harmony-LICENSE.txt'             = 'licenses/Harmony-LICENSE.txt'
     'licenses/Mono.Cecil-LICENSE.txt'          = 'licenses/Mono.Cecil-LICENSE.txt'
     'licenses/MonoMod-LICENSE.txt'             = 'licenses/MonoMod-LICENSE.txt'
+    # Additional to the BepInEx 5 archive: these ship only inside
+    # vendor/bepinex-il2cpp/, which the installer ZIP carries for the IL2CPP
+    # (Xbox Game Pass) build of the game. See licenses/README.md for which
+    # binary each one covers.
+    'licenses/Il2CppInterop-LICENSE.txt'          = 'licenses/Il2CppInterop-LICENSE.txt'
+    'licenses/Cpp2IL-LICENSE.txt'                 = 'licenses/Cpp2IL-LICENSE.txt'
+    'licenses/Disarm-LICENSE.txt'                 = 'licenses/Disarm-LICENSE.txt'
+    'licenses/AsmResolver-LICENSE.txt'            = 'licenses/AsmResolver-LICENSE.txt'
+    'licenses/AssetRipper.CIL-LICENSE.txt'        = 'licenses/AssetRipper.CIL-LICENSE.txt'
+    'licenses/AssetRipper.Primitives-LICENSE.txt' = 'licenses/AssetRipper.Primitives-LICENSE.txt'
+    'licenses/Iced-LICENSE.txt'                   = 'licenses/Iced-LICENSE.txt'
+    'licenses/Capstone.NET-LICENSE.txt'           = 'licenses/Capstone.NET-LICENSE.txt'
+    'licenses/Dobby-LICENSE.txt'                  = 'licenses/Dobby-LICENSE.txt'
+    'licenses/SemanticVersioning-LICENSE.txt'     = 'licenses/SemanticVersioning-LICENSE.txt'
+    'licenses/dotnet-runtime-LICENSE.txt'         = 'licenses/dotnet-runtime-LICENSE.txt'
 }
 
 foreach ($source in $RequiredNotices.Values) {
     $path = Join-Path $projectDir $source
     if (-not (Test-Path $path)) {
         throw "Required licence file missing: $source. Both release ZIPs redistribute binaries whose licences require this notice to accompany them; refusing to package without it."
+    }
+}
+
+# The IL2CPP payload, which the shared packager knows nothing about: it stages
+# one build output into plugins/ and one vendor/<loader>/ directory, and this
+# mod ships two of each. The launcher picks between them at install time from
+# the variants block in launcher-manifest.json, so both have to be in the ZIP
+# and both have to sit exactly where that manifest says.
+$Il2CppBuildDir = 'src/WobblyLifeHeadTracking.Il2Cpp/bin/Release/net6.0'
+$Il2CppPayload = [ordered]@{
+    'plugins-il2cpp/WobblyLifeHeadTracking.dll' = "$Il2CppBuildDir/WobblyLifeHeadTracking.dll"
+    'plugins-il2cpp/CameraUnlock.Core.dll'      = "$Il2CppBuildDir/CameraUnlock.Core.dll"
+    'plugins-il2cpp/CameraUnlock.Core.Unity.dll' = "$Il2CppBuildDir/CameraUnlock.Core.Unity.dll"
+    'vendor/bepinex-il2cpp/BepInEx_UnityIL2CPP_x64.zip' = 'vendor/bepinex-il2cpp/BepInEx_UnityIL2CPP_x64.zip'
+    'vendor/bepinex-il2cpp/LICENSE'             = 'vendor/bepinex-il2cpp/LICENSE'
+    'vendor/bepinex-il2cpp/README.md'           = 'vendor/bepinex-il2cpp/README.md'
+}
+
+foreach ($source in $Il2CppPayload.Values) {
+    $path = Join-Path $projectDir $source
+    if (-not (Test-Path $path)) {
+        throw "IL2CPP payload file missing: $source. The Xbox Game Pass build of the game needs it, and launcher-manifest.json names it, so a ZIP without it fails to install on that copy. Run 'pixi run build' first."
     }
 }
 
@@ -47,7 +97,7 @@ function Add-NoticesToZip {
 
     $archive = [System.IO.Compression.ZipFile]::Open($ZipPath, 'Update')
     try {
-        $existing = @($archive.Entries | ForEach-Object { $_.FullName })
+        $existing = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
         foreach ($entryName in $Extra.Keys) {
             if ($existing -contains $entryName) { continue }
             $sourcePath = Join-Path $projectDir $Extra[$entryName]
@@ -68,7 +118,7 @@ function Assert-NoticesInZip {
 
     $archive = [System.IO.Compression.ZipFile]::OpenRead($ZipPath)
     try {
-        $names = @($archive.Entries | ForEach-Object { $_.FullName })
+        $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
     } finally {
         $archive.Dispose()
     }
@@ -106,6 +156,15 @@ foreach ($k in $RequiredNotices.Keys) {
 Write-Host "Installer ZIP:" -ForegroundColor Cyan
 Add-NoticesToZip -ZipPath $zips.GithubZip -Extra $installerExtra
 
+# Installer ZIP only. The Nexus ZIP is the Mono payload alone - a mod manager
+# deploys into one fixed subtree and cannot reach a Game Pass install, so
+# shipping the IL2CPP DLLs there would only give a Game Pass user a download
+# that looks right and does nothing. The README sends them to the installer.
+Write-Host "Installer ZIP (IL2CPP payload):" -ForegroundColor Cyan
+$il2cppExtra = @{}
+foreach ($k in $Il2CppPayload.Keys) { $il2cppExtra[$k] = $Il2CppPayload[$k] }
+Add-NoticesToZip -ZipPath $zips.GithubZip -Extra $il2cppExtra
+
 Write-Host "NexusMods ZIP:" -ForegroundColor Cyan
 Add-NoticesToZip -ZipPath $zips.NexusZip -Extra $nexusExtra
 
@@ -114,6 +173,10 @@ Write-Host "Verifying..." -ForegroundColor Cyan
 $expected = @($RequiredNotices.Keys)
 Assert-NoticesInZip -ZipPath $zips.GithubZip -Expected $expected
 Assert-NoticesInZip -ZipPath $zips.NexusZip -Expected $expected
+Assert-NoticesInZip -ZipPath $zips.GithubZip -Expected @($Il2CppPayload.Keys)
+
+& node (Join-Path $projectDir 'cameraunlock-core/scripts/validate-manifest.mjs') $zips.GithubZip
+if ($LASTEXITCODE -ne 0) { throw 'Installer manifest validation failed.' }
 
 Write-Host ""
 Write-Host "=== Package Complete ===" -ForegroundColor Magenta
