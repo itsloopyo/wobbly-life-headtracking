@@ -20,17 +20,24 @@ An unofficial head tracking mod for Wobbly Life that moves the camera with your 
 
 ## Requirements
 
-- Wobbly Life on [Steam](https://store.steampowered.com/app/1211020/Wobbly_Life/) or [Xbox Game Pass / Microsoft Store](https://www.xbox.com/games/store/wobbly-life/9ns86bq33spx)
+- Wobbly Life on [Steam](https://store.steampowered.com/app/1211020/Wobbly_Life/) or [Xbox Game Pass](https://www.xbox.com/games/store/wobbly-life/9ns86bq33spx)
 - [OpenTrack](https://github.com/opentrack/opentrack) or a compatible head tracking app (smartphone, webcam, or dedicated hardware)
 - Windows
 
 The two stores ship different builds of the game - the Steam one runs Mono and
-the Game Pass one runs IL2CPP - so they need different versions of the mod and
+the Xbox Game Pass one runs IL2CPP - so they need different versions of the mod and
 different versions of BepInEx. One download covers both; the installer and the
 Lopari launcher each work out which one your copy is and deploy the matching
 pair. Own it on both and the installer does both.
 
 ## Installation
+
+### Lopari
+
+Once this mod is available in Lopari, download [Lopari](https://lopari.app), choose **Wobbly Life**, and click
+**Play with head tracking**.
+
+### Standalone Installer
 
 1. Download the latest release from the [Releases page](https://github.com/itsloopyo/wobbly-life-headtracking/releases)
 2. Extract the ZIP anywhere
@@ -38,12 +45,12 @@ pair. Own it on both and the installer does both.
 4. Configure OpenTrack to output UDP to `127.0.0.1:4242`
 5. Launch Wobbly Life
 
-The installer finds the game itself: the Steam library, and the Game Pass
+The installer finds the game itself: the Steam library, and the Xbox Game Pass
 install under `XboxGames\Wobbly Life\Content`. If it can't find the game:
 - Set the `WOBBLY_LIFE_PATH` environment variable to your game folder, or
 - Run from command prompt: `install.cmd "D:\Games\Wobbly Life"`
 
-On Game Pass, the first launch needs an internet connection and takes longer
+On Xbox Game Pass, the first launch needs an internet connection and takes longer
 while BepInEx 6 downloads Unity reference libraries and generates interop
 assemblies. These are cached in the game folder. Check `BepInEx/LogOutput.log`
 for progress or errors.
@@ -74,7 +81,7 @@ The two `plugins/` folders hold different builds of the same three files. Mixing
 them does nothing visible: the game starts, the mod never loads, and
 `BepInEx/LogOutput.log` is the only place that says so.
 
-The Nexus archive contains the Mono payload only. For the Game Pass build,
+The Nexus archive contains the Mono payload only. For the Xbox Game Pass build,
 use the installer ZIP or the manual steps above.
 
 ## Setting Up OpenTrack
@@ -250,7 +257,7 @@ restarting the game.
 - If you own the game on both stores, check you modded the copy you are
   launching. The Xbox app and Steam each start their own.
 
-**Game Pass: the game hangs on a black screen the first time:**
+**Xbox Game Pass: the game hangs on a black screen the first time:**
 - BepInEx 6 generates interop assemblies and downloads Unity libraries on the
   first launch. Check `BepInEx/LogOutput.log` for progress or errors.
 
