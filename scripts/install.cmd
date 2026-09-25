@@ -34,6 +34,9 @@ set "IL2CPP_VENDOR_ZIP_NAME=BepInEx_UnityIL2CPP_x64.zip"
 set "IL2CPP_PLUGIN_DIR_NAME=plugins-il2cpp"
 :: Post-install help text. `&echo ` starts each further line.
 set "MOD_CONTROLS=Controls:&echo   End  / Ctrl+Shift+Y    - Toggle head tracking on/off&echo   PgUp / Ctrl+Shift+G    - Cycle tracking mode&echo   PgDn / Ctrl+Shift+H    - Toggle yaw mode (world/local)"
+:: Not used by this mod. Set blank so a value another mod's wrapper left in
+:: the same console does not reach the body.
+set "IL2CPP_MOD_DLLS="
 :: --- END CONFIG BLOCK ---
 
 :: Pin delayed expansion off before `%*` is expanded on the `call` below.
