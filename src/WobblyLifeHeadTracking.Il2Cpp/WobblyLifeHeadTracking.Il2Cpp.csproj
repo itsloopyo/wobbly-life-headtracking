@@ -77,6 +77,8 @@
   <ItemGroup>
     <Compile Include="..\WobblyLifeHeadTracking\Config\WobblyLifeConfig.cs"
              Link="Config\WobblyLifeConfig.cs" />
+    <Compile Include="..\WobblyLifeHeadTracking\Legacy\*.cs"
+             Link="Legacy\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

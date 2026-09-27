@@ -5,6 +5,7 @@ using CameraUnlock.Core.Unity.State;
 using UnityEngine;
 using WobblyLifeHeadTracking.Camera;
 using WobblyLifeHeadTracking.Config;
+using WobblyLifeHeadTracking.Legacy;
 
 namespace WobblyLifeHeadTracking
 {
@@ -21,7 +22,14 @@ namespace WobblyLifeHeadTracking
 
         private void Awake()
         {
-            _config = new WobblyLifeConfig(WobblyLifeHeadTrackingPlugin.ConfigFile);
+            // The frozen reader binds every definition with saving off and writes nothing. The
+            // runtime binds the same definitions after it and writes the file once, as the first
+            // Bind with saving on used to.
+            var file = WobblyLifeHeadTrackingPlugin.ConfigFile;
+            LegacyConfigReader.Read(file);
+            file.SaveOnConfigSet = true;
+            _config = new WobblyLifeConfig(file);
+            file.Save();
             _trackingEnabled = _config.EnableOnStartup.Value;
 
             _cameraController = gameObject.AddComponent<WobblyLifeCameraController>();

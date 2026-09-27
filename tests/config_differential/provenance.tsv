@@ -1,0 +1,32 @@
+# What the differential test compares, and where each file came from.
+# Columns: role, source (commit:path, a release asset, or the path in this repo), sha256 of the bytes.
+# The one published build is the rolling dev pre-release, built from 0a3073b; its installer carries the Steam
+# (Mono, BepInEx 5) payload under plugins/ and the Xbox Game Pass (IL2CPP, BepInEx 6) payload under plugins-il2cpp/.
+# There is no v* release and no predecessor repo. Config/WobblyLifeConfig.cs is the reader both payloads read
+# the .cfg with (the IL2CPP project compiles the same file); the oracle is that file byte for byte. The frozen
+# reader in src/WobblyLifeHeadTracking/Legacy is WobblyLifeConfig.cs at 5ea6775 (unchanged since the dev build),
+# restructured to fill LegacyConfig and write nothing, with every core constant it read written as its value.
+published reader	0a3073b:src/WobblyLifeHeadTracking/Config/WobblyLifeConfig.cs	68d9ee66a8812f1487315095b6b638ec08707c12dda7264f5a6b8d7871d85a39
+frozen from	5ea6775:src/WobblyLifeHeadTracking/Config/WobblyLifeConfig.cs	68d9ee66a8812f1487315095b6b638ec08707c12dda7264f5a6b8d7871d85a39
+oracle copy	tests/config_differential/Oracle/WobblyLifeConfig.cs	68d9ee66a8812f1487315095b6b638ec08707c12dda7264f5a6b8d7871d85a39
+frozen reader	src/WobblyLifeHeadTracking/Legacy/LegacyConfig.cs	804855773fb064269990c3314e810973224deda87c3fc41c72b3c90655d67577
+frozen reader	src/WobblyLifeHeadTracking/Legacy/LegacyConfigReader.cs	48970c922a07b5d2a7752b2276851e4d3538bb0ab2c3cab7fd5113145b1e40e4
+BepInEx 5	vendor/bepinex/BepInEx_win_x64.zip	82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4
+# BepInEx 5.4.23.5, unchanged since the dev build. The test and the Steam first-run harness ran its BepInEx/core/BepInEx.dll
+# (sha256 8255b28902886085c578b9e427d3073c97002db85176d2090cdeda90ef14ce70), which the game loads.
+BepInEx 6	vendor/bepinex-il2cpp/BepInEx_UnityIL2CPP_x64.zip	2a7cbf74d26abe4765c3e662db1721b923bac39849ebfef2ca5dc7de7e2d9b7f
+# BepInEx 6.0.0-be.785, unchanged since the dev build. The Game Pass first-run harness ran its BepInEx/core/BepInEx.Core.dll
+# (sha256 352aacc2d5356489a00891f76db28b6463c81d25bcb02f90035171a669b7e35b) on .NET 8, with the UnityEngine.CoreModule
+# of the UnityEngine.Modules 2022.3.62 package the IL2CPP plugin is built against.
+# No published build shipped the plugin .cfg, in its ZIP or as a launcher-manifest.json seed (every seed is
+# BepInEx/config/BepInEx.cfg), so the inputs are what each payload writes at its first start: the .cfg the dev
+# pre-release's own WobblyLifeHeadTracking.dll, taken from its installer ZIP (the ZIP's SHA-256 matches the digest
+# GitHub reports for the asset), writes when its WobblyLifeConfig constructor runs on a ConfigFile at a path with no
+# file and the plugin's BepInPlugin metadata (v0.0.0), as the loader builds it. The Steam DLL ran on .NET Framework
+# 4.8 with the Unity reference stubs of pixi run setup. The two files differ only in the "Acceptable values" comment
+# lines, which list whichever KeyCode each harness loaded; no reader reads a comment line. The test reads every
+# input with BepInEx 5.
+input source	release dev WobblyLifeHeadTracking-dev-installer.zip a546ab90bc271fefac2dd5ba6264c55c778b940d1eb99a5f4ef8dae33278b8f9 plugins/WobblyLifeHeadTracking.dll 435ec3d1dc1417eea54b0cbe53d588c15f6b4e7859f2fff191e66e6553c78a03	-
+input	tests/config_differential/data/first-run/dev.cfg	2db7e9bba04e3fb49f1f491231754cdc07c6690459c4df0268b324245e8a2d5b
+input source	release dev WobblyLifeHeadTracking-dev-installer.zip a546ab90bc271fefac2dd5ba6264c55c778b940d1eb99a5f4ef8dae33278b8f9 plugins-il2cpp/WobblyLifeHeadTracking.dll 72f81b5fa23073823010b1a7cbe25d6d653c67793fef4abad99d6341739806f4	-
+input	tests/config_differential/data/first-run/dev-il2cpp.cfg	048c8bdd2ca110a70344940f1251d4a876fbd97a03266b9b0b1d7e71c35bb364
