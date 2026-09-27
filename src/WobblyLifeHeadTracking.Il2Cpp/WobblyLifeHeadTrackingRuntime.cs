@@ -1,10 +1,10 @@
 using BepInEx.Logging;
+using CameraUnlock.Core.Input;
 using CameraUnlock.Core.Tracking;
 using CameraUnlock.Core.Unity.Extensions;
 using UnityEngine;
 using WobblyLifeHeadTracking.Camera;
 using WobblyLifeHeadTracking.Config;
-using WobblyLifeHeadTracking.Legacy;
 using WobblyLifeHeadTracking.State;
 
 namespace WobblyLifeHeadTracking
@@ -13,7 +13,10 @@ namespace WobblyLifeHeadTracking
     {
         private static ManualLogSource Logger => WobblyLifeHeadTrackingPlugin.Log;
 
-        private WobblyLifeConfig _config;
+        private WobblyLifeSettings _config;
+        private KeyBinding[] _toggleKeys;
+        private KeyBinding[] _cycleTrackingModeKeys;
+        private KeyBinding[] _yawModeKeys;
         private WobblyLifeCameraController _cameraController;
         private PolledSceneGameState _gameState;
         private bool _trackingEnabled;
@@ -22,34 +25,32 @@ namespace WobblyLifeHeadTracking
 
         private void Awake()
         {
-            // The frozen reader binds every definition with saving off and writes nothing. The
-            // runtime binds the same definitions after it and writes the file once, as the first
-            // Bind with saving on used to.
-            var file = WobblyLifeHeadTrackingPlugin.ConfigFile;
-            LegacyConfigReader.Read(file);
-            file.SaveOnConfigSet = true;
-            _config = new WobblyLifeConfig(file);
-            file.Save();
-            _trackingEnabled = _config.EnableOnStartup.Value;
+            _config = SettingsStore.Load();
+            _trackingEnabled = _config.EnableOnStartup;
+            _toggleKeys = SettingsStore.Hotkeys("ToggleKey", _config.ToggleKeyName);
+            _cycleTrackingModeKeys = SettingsStore.Hotkeys("CycleTrackingModeKey", _config.CycleTrackingModeKeyName);
+            _yawModeKeys = SettingsStore.Hotkeys("YawModeKey", _config.YawModeKeyName);
 
             _cameraController = gameObject.AddComponent<WobblyLifeCameraController>();
             _cameraController.Initialize(_config);
-            _cameraController.WorldSpaceYaw = _config.WorldSpaceYaw.Value;
+            _cameraController.WorldSpaceYaw = _config.WorldSpaceYaw;
+            // The table reads a pair that names no mode (both off) as its defaults, so the pair
+            // always decodes.
+            _cameraController.Tracking.Mode = TrackingModeChannels.Decode(_config.RotationEnabled, _config.PositionEnabled).Value;
 
             _gameState = new PolledSceneGameState(Logger.LogInfo)
             {
-                DisableInMenuScenes = _config.DisableInMenus.Value,
-                DisableWhenPaused = _config.DisableWhenPaused.Value
+                DisableInMenuScenes = _config.DisableInMenus,
+                DisableWhenPaused = _config.DisableWhenPaused
             };
             _gameState.GameplayStateChanged += OnGameplayStateChanged;
-            _config.File.SettingChanged += OnConfigSettingChanged;
             _wasTrackingAllowed = _gameState.IsInGameplay;
 
             Logger.LogInfo($"{WobblyLifeHeadTrackingPlugin.PluginName} v{WobblyLifeHeadTrackingPlugin.PluginVersion} loaded (IL2CPP build)");
             var ports = _config.PlayerPorts;
             Logger.LogInfo($"Multiplayer head tracking: Player 1=port {ports[0]}, Player 2={ports[1]}, Player 3={ports[2]}, Player 4={ports[3]}");
             Logger.LogInfo($"Head tracking is {(_trackingEnabled ? "enabled" : "disabled")} on startup");
-            Logger.LogInfo($"Controls: Toggle=[{_config.ToggleKey.Value}], CycleMode=[{_config.PositionToggleKey.Value}], YawMode=[{_config.YawModeKey.Value}]");
+            Logger.LogInfo($"Controls: Toggle=[{_config.ToggleKeyName}], CycleMode=[{_config.CycleTrackingModeKeyName}], YawMode=[{_config.YawModeKeyName}]");
         }
 
         private void Update()
@@ -61,9 +62,9 @@ namespace WobblyLifeHeadTracking
 
         private void HandleKeyBinds()
         {
-            if (ChordHotkeys.IsActionPressed(_config.ToggleKey.Value, ChordHotkeys.ToggleLetter)) ToggleTracking();
-            if (ChordHotkeys.IsActionPressed(_config.PositionToggleKey.Value, ChordHotkeys.PositionLetter)) CycleTrackingMode();
-            if (ChordHotkeys.IsActionPressed(_config.YawModeKey.Value, ChordHotkeys.FourthToggleLetter)) ToggleYawMode();
+            if (KeyBindingInput.IsTriggered(_toggleKeys)) ToggleTracking();
+            if (KeyBindingInput.IsTriggered(_cycleTrackingModeKeys)) CycleTrackingMode();
+            if (KeyBindingInput.IsTriggered(_yawModeKeys)) ToggleYawMode();
         }
 
         public void ToggleYawMode()
@@ -71,12 +72,20 @@ namespace WobblyLifeHeadTracking
             bool newMode = !_cameraController.WorldSpaceYaw;
             _cameraController.WorldSpaceYaw = newMode;
             Logger.LogInfo($"Yaw mode: {(newMode ? "world-space (horizon-locked)" : "camera-local")}");
+            SettingsStore.Save(c => c.WorldSpaceYaw = newMode);
         }
 
         private void CycleTrackingMode()
         {
             TrackingMode mode = _cameraController.Tracking.CycleMode();
             Logger.LogInfo($"Tracking mode: {mode.Description()}");
+            bool rotation, position;
+            TrackingModeChannels.Encode(mode, out rotation, out position);
+            SettingsStore.Save(c =>
+            {
+                c.RotationEnabled = rotation;
+                c.PositionEnabled = position;
+            });
         }
 
         private void LateUpdate()
@@ -123,26 +132,15 @@ namespace WobblyLifeHeadTracking
 
         private void OnGameplayStateChanged(bool isGameplay)
         {
-            if (!isGameplay && _config.DisableInMenus.Value)
+            if (!isGameplay && _config.DisableInMenus)
             {
                 _cameraController.ResetTracking();
                 _cameraController.InvalidateCamera();
             }
         }
 
-        private void OnConfigSettingChanged(object sender, BepInEx.Configuration.SettingChangedEventArgs e)
-        {
-            _gameState.DisableInMenuScenes = _config.DisableInMenus.Value;
-            _gameState.DisableWhenPaused = _config.DisableWhenPaused.Value;
-        }
-
         private void OnDestroy()
         {
-            if (_config != null)
-            {
-                _config.File.SettingChanged -= OnConfigSettingChanged;
-            }
-
             if (_gameState != null)
             {
                 _gameState.GameplayStateChanged -= OnGameplayStateChanged;
@@ -162,6 +160,7 @@ namespace WobblyLifeHeadTracking
 
         public bool IsTrackingAllowed => _gameState == null || _gameState.IsInGameplay;
 
+        /// <summary>Turns head tracking on or off for this session. Never saved.</summary>
         public void SetTrackingEnabled(bool enabled)
         {
             if (_trackingEnabled == enabled) return;

@@ -36,6 +36,10 @@ uninstall = "scripts\\uninstall.cmd"
 # The config differential test (tests/config_differential) holds the frozen legacy import to the
 # dev pre-release's reader over every input core's mutation corpus generates.
 test = { cmd = "dotnet test tests/WobblyLifeHeadTracking.Tests/WobblyLifeHeadTracking.Tests.csproj -c Release", depends-on = ["build"] }
+# Rewrites config/CameraUnlock.ini from the config table after a change to a row, a comment or
+# a default, then the per_game of launcher-manifest.json's config descriptor. The render test
+# compares the two on every `pixi run test`, so the committed file cannot drift from the code.
+render-config = { cmd = "dotnet test tests/WobblyLifeHeadTracking.Tests/WobblyLifeHeadTracking.Tests.csproj -c Release --filter FullyQualifiedName~RenderTests.CommittedFileIsTheRenderedDefaults && node cameraunlock-core/scripts/encode-seed.mjs", env = { CAMERAUNLOCK_RENDER_CONFIG = "write" }, depends-on = ["build"] }
 package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["test"] }
 clean = "dotnet clean src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj"
 update-deps = "powershell -ExecutionPolicy Bypass -File scripts/update-deps.ps1"
@@ -45,3 +49,6 @@ validate-release = "powershell -ExecutionPolicy Bypass -File scripts/validate-re
 
 # Full release workflow (validate, build, package)
 release = "powershell -ExecutionPolicy Bypass -File scripts/release.ps1"
+
+# Checks the launcher contract against the built installer ZIP, the Nexus ZIP's contents included.
+validate-manifest = "node cameraunlock-core/scripts/validate-manifest.mjs"

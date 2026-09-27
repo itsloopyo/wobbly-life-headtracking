@@ -67,11 +67,11 @@ This mod includes built-in smoothing to handle network jitter, so if your tracki
 
 ### Multiplayer Ports
 
-For couch co-op, each player needs their own tracker on a separate port. Ports are configurable in the config file:
+For couch co-op, each player needs their own tracker on a separate port. Ports are set in `BepInEx\config\CameraUnlock.ini`:
 
 | Player | Default UDP Port | Config Entry |
 |--------|-----------------|--------------|
-| Player 1 | 4242 | `Player1Port` |
+| Player 1 | 4242 | `UdpPort` |
 | Player 2 | 4243 | `Player2Port` |
 | Player 3 | 4244 | `Player3Port` |
 | Player 4 | 4245 | `Player4Port` |
@@ -96,51 +96,7 @@ Check `BepInEx/LogOutput.log` for status messages.
 
 ## Configuration
 
-After first run, a config file is created at:
-`BepInEx/config/com.cameraunlock.wobblylife.headtracking.cfg`
-
-```ini
-[Network]
-Player1Port = 4242
-Player2Port = 4243
-Player3Port = 4244
-Player4Port = 4245
-
-[Sensitivity]
-YawSensitivity = 1.0
-PitchSensitivity = 1.0
-RollSensitivity = 1.0
-
-[Smoothing]
-LocalSmoothing = 0.0
-RemoteSmoothing = 0.15
-
-[General]
-WorldSpaceYaw = true
-
-[Controls]
-EnableOnStartup = true
-ToggleKey = End
-PositionToggleKey = PageUp
-YawModeKey = PageDown
-
-[Position]
-SensitivityX = 1.0
-SensitivityY = 1.0
-SensitivityZ = 1.0
-LimitX = 0.30
-LimitY = 0.15
-LimitYDown = 0.05
-LimitZ = 0.40
-
-[GameState]
-DisableInMenus = true
-DisableWhenPaused = true
-```
-
-`LocalSmoothing` applies when the tracker runs on this machine, `RemoteSmoothing`
-when it is a phone or other network device. Both cover rotation and position, and
-the value is picked per connection from the packet source address.
+Settings live in `BepInEx\config\CameraUnlock.ini`, which the mod creates on its first start. BepInEx's ConfigurationManager does not list them; edit the file with any text editor. The README's Configuration section describes every setting and what `default` means.
 
 ## Troubleshooting
 
@@ -160,7 +116,7 @@ the value is picked per connection from the packet source address.
 
 ### Camera jittering
 
-1. Increase `RemoteSmoothing` (phone/network tracker) or `LocalSmoothing` (tracker on this PC) in config (try 0.5-0.7)
+1. Increase `RemoteSmoothing` (phone/network tracker) or `LocalSmoothing` (tracker on this PC) in `CameraUnlock.ini` (try 0.5-0.7)
 2. Enable Accela filter in OpenTrack
 3. Improve lighting for webcam-based tracking
 

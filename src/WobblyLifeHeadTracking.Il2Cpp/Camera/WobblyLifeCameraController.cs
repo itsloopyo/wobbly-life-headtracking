@@ -21,7 +21,6 @@ namespace WobblyLifeHeadTracking.Camera
     {
         private const int CameraScanIntervalFrames = 30;
 
-        private WobblyLifeConfig _config;
         private MultiPlayerTrackingManager _tracking;
 
         private int _nextScanFrame;
@@ -47,39 +46,38 @@ namespace WobblyLifeHeadTracking.Camera
         // exactly one controller, on the plugin's host object.
         internal static WobblyLifeCameraController Instance { get; private set; }
 
-        public void Initialize(WobblyLifeConfig config)
+        public void Initialize(WobblyLifeSettings config)
         {
             Instance = this;
-            _config = config;
-
-            _tracking = new MultiPlayerTrackingManager(_config.PlayerPorts)
+            _tracking = new MultiPlayerTrackingManager(config.PlayerPorts)
             {
                 Log = msg => WobblyLifeHeadTrackingPlugin.Log?.LogInfo(msg)
             };
-            ApplyTrackingSettings();
+            ApplyTrackingSettings(config);
             GameTypes.Resolve(msg => WobblyLifeHeadTrackingPlugin.Log?.LogInfo(msg));
             _tracking.Start();
-
-            // Sensitivity/smoothing/position settings are pushed into the tracking
-            // manager, so re-push whenever any config value changes (changes are rare;
-            // re-applying everything is cheaper than tracking which entry changed).
-            _config.File.SettingChanged += OnConfigSettingChanged;
 
             _initialized = true;
         }
 
-        private void OnConfigSettingChanged(object sender, BepInEx.Configuration.SettingChangedEventArgs e)
+        // The position mapping the mod has always shipped in code: every sensitivity 1 and x
+        // inverted. The x inversion was never a setting.
+        private void ApplyTrackingSettings(WobblyLifeSettings config)
         {
-            ApplyTrackingSettings();
-        }
-
-        private void ApplyTrackingSettings()
-        {
-            _tracking.ApplySensitivity(_config.Sensitivity);
             // Both values go to every player's processor; the manager selects between
             // them per player from that player's receiver connection locality.
-            _tracking.ApplySmoothing(_config.LocalSmoothing.Value, _config.RemoteSmoothing.Value);
-            _tracking.ApplyPositionSettings(_config.PositionSettingsFromConfig);
+            _tracking.ApplySmoothing(config.LocalSmoothing, config.RemoteSmoothing);
+            PositionSettings limits = config.Position;
+            _tracking.ApplyPositionSettings(new PositionSettings(
+                sensitivityX: 1f, sensitivityY: 1f, sensitivityZ: 1f,
+                limitX: limits.LimitX,
+                limitY: limits.LimitY,
+                limitYDown: limits.LimitYDown,
+                limitZ: limits.LimitZ,
+                limitZBack: limits.LimitZBack,
+                localSmoothing: config.LocalSmoothing,
+                remoteSmoothing: config.RemoteSmoothing,
+                invertX: true, invertY: false, invertZ: false));
         }
 
         public void UpdateTracking()
@@ -190,11 +188,6 @@ namespace WobblyLifeHeadTracking.Camera
 
         private void OnDestroy()
         {
-            if (_config != null)
-            {
-                _config.File.SettingChanged -= OnConfigSettingChanged;
-            }
-
             if (Instance == this)
             {
                 Instance = null;

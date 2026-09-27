@@ -71,12 +71,14 @@
     <PackageReference Include="Il2CppInterop.ReferenceLibs" Version="1.0.0" />
   </ItemGroup>
 
-  <!-- The ini surface is single-sourced with the Mono build. Two copies of the
-       config binding would drift, and the README and Nexus page are both written
-       against it. -->
+  <!-- The config is single-sourced with the Mono build: the table, the owner, the
+       legacy import and the store that loads and saves CameraUnlock.ini. Two copies
+       would drift, and the README and Nexus page are both written against it. -->
   <ItemGroup>
-    <Compile Include="..\WobblyLifeHeadTracking\Config\WobblyLifeConfig.cs"
-             Link="Config\WobblyLifeConfig.cs" />
+    <Compile Include="..\WobblyLifeHeadTracking\Config\*.cs"
+             Link="Config\%(Filename)%(Extension)" />
+    <Compile Include="..\WobblyLifeHeadTracking\SettingsStore.cs"
+             Link="SettingsStore.cs" />
     <Compile Include="..\WobblyLifeHeadTracking\Legacy\*.cs"
              Link="Legacy\%(Filename)%(Extension)" />
   </ItemGroup>
