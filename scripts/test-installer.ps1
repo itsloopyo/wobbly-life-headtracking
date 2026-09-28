@@ -2,6 +2,25 @@ param([Parameter(Mandatory)][string]$PackagePath, [switch]$Interactive)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+# Not Get-FileHash: Windows PowerShell 5.1 autoloads it from a script module,
+# and a powershell.exe started from pwsh (GitHub Actions' shell: pwsh)
+# inherits pwsh's PSModulePath, resolves the Core-only
+# Microsoft.PowerShell.Utility first and reports the cmdlet as not recognized.
+function Get-Sha256Hex {
+    [OutputType([string])]
+    param([Parameter(Mandatory)][string]$LiteralPath)
+
+    $sha    = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead((Convert-Path -LiteralPath $LiteralPath))
+    try {
+        return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $stream.Dispose()
+        $sha.Dispose()
+    }
+}
+
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $root = Join-Path ([IO.Path]::GetTempPath()) ('wobbly-installer-' + [guid]::NewGuid().ToString('N'))
 $package = Join-Path $root 'package'
@@ -47,8 +66,8 @@ foreach ($entry in @(@{ Path = $mono; Source = 'plugins'; Marker = 'BepInEx.dll'
         throw "Wrong loader in $($entry.Path)"
     }
     foreach ($dll in @('WobblyLifeHeadTracking.dll', 'CameraUnlock.Core.dll', 'CameraUnlock.Core.Unity.dll')) {
-        $expected = (Get-FileHash -LiteralPath (Join-Path $package ($entry.Source + '/' + $dll))).Hash
-        $actual = (Get-FileHash -LiteralPath (Join-Path $entry.Path ('BepInEx/plugins/' + $dll))).Hash
+        $expected = Get-Sha256Hex -LiteralPath (Join-Path $package ($entry.Source + '/' + $dll))
+        $actual = Get-Sha256Hex -LiteralPath (Join-Path $entry.Path ('BepInEx/plugins/' + $dll))
         if ($expected -ne $actual) { throw "Wrong $dll in $($entry.Path)" }
     }
     $configDir = Join-Path $entry.Path 'BepInEx/config'
