@@ -33,7 +33,7 @@ described under "Wobbly Life" below.
 | Harmony 2 | upstream of HarmonyX | MIT | Its code travels inside HarmonyX |
 | Mono.Cecil | 0.10.4 | MIT | Inside the bundled BepInEx archive (`BepInEx/core/Mono.Cecil*.dll`) |
 | MonoMod | 22.01.29.01 | MIT | Inside the bundled BepInEx archive (`BepInEx/core/MonoMod.*.dll`) |
-| cameraunlock-core | e212735498e3489c87d2a65c49783fa8f6a0a07f | MIT | Compiled into `CameraUnlock.Core.dll` and `CameraUnlock.Core.Unity.dll` |
+| cameraunlock-core | e64a81ff0f7bde7ddb3102382a061b4c91f01254 | MIT | Compiled into `CameraUnlock.Core.dll` and `CameraUnlock.Core.Unity.dll` |
 | OpenTrack | n/a | ISC | Not bundled; UDP protocol interoperability only |
 
 ---
@@ -861,7 +861,7 @@ MIT wants this notice in every copy. It also ships as
 `licenses/cameraunlock-core-LICENSE.txt`.
 
 - Upstream: https://github.com/itsloopyo/cameraunlock-core
-- Pinned commit: `e212735498e3489c87d2a65c49783fa8f6a0a07f`
+- Pinned commit: `e64a81ff0f7bde7ddb3102382a061b4c91f01254`
 
 ```
 MIT License
