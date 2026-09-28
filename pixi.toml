@@ -33,14 +33,17 @@ verify-refs = { cmd = "powershell -ExecutionPolicy Bypass -File cameraunlock-cor
 build-release = { depends-on = ["build"] }
 install = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1 Release", depends-on = ["build"] }
 uninstall = "scripts\\uninstall.cmd"
-# The config differential test (tests/config_differential) holds the frozen legacy import to the
-# dev pre-release's reader over every input core's mutation corpus generates.
-test = { cmd = "dotnet test tests/WobblyLifeHeadTracking.Tests/WobblyLifeHeadTracking.Tests.csproj -c Release", depends-on = ["build"] }
+# test-differential: the config differential test (tests/config_differential) holds the frozen
+# legacy import to the dev pre-release's reader over every input core's mutation corpus generates.
+# test-unit: every other test in the project.
+test-unit = { cmd = "dotnet test tests/WobblyLifeHeadTracking.Tests/WobblyLifeHeadTracking.Tests.csproj -c Release --filter FullyQualifiedName!~Differential", depends-on = ["build"] }
+test-differential = { cmd = "dotnet test tests/WobblyLifeHeadTracking.Tests/WobblyLifeHeadTracking.Tests.csproj -c Release --filter FullyQualifiedName~Differential", depends-on = ["build"] }
+test = { depends-on = ["test-unit", "test-differential"] }
 # Rewrites config/CameraUnlock.ini from the config table after a change to a row, a comment or
 # a default, then the per_game of launcher-manifest.json's config descriptor. The render test
 # compares the two on every `pixi run test`, so the committed file cannot drift from the code.
 render-config = { cmd = "dotnet test tests/WobblyLifeHeadTracking.Tests/WobblyLifeHeadTracking.Tests.csproj -c Release --filter FullyQualifiedName~RenderTests.CommittedFileIsTheRenderedDefaults && node cameraunlock-core/scripts/encode-seed.mjs", env = { CAMERAUNLOCK_RENDER_CONFIG = "write" }, depends-on = ["build"] }
-package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["test"] }
+package = { cmd = "powershell -ExecutionPolicy Bypass -File scripts/package-release.ps1", depends-on = ["test-unit"] }
 clean = "dotnet clean src/WobblyLifeHeadTracking/WobblyLifeHeadTracking.csproj"
 update-deps = "powershell -ExecutionPolicy Bypass -File scripts/update-deps.ps1"
 
