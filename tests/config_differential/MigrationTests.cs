@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using CameraUnlock.Core.Config;
 using CameraUnlock.Core.Config.Testing;
+using CameraUnlock.Core.Input;
 using WobblyLifeHeadTracking.Config;
 using WobblyLifeHeadTracking.Legacy;
 using UnityEngine;
@@ -40,7 +41,7 @@ namespace WobblyLifeHeadTracking.Tests.ConfigDifferential
         public void ComparisonTwo()
         {
             var failures = new List<string>();
-            int migrated = 0, deferred = 0, created = 0, refused = 0;
+            int migrated = 0, created = 0, refused = 0;
             foreach (KeyValuePair<string, byte[]> input in Corpus.Inputs())
             {
                 string where = input.Key + ": ";
@@ -73,43 +74,29 @@ namespace WobblyLifeHeadTracking.Tests.ConfigDifferential
                 LegacyFollowsDefaultsIni follows = LegacyMigration.Map(import.Values, expected, dropped, poseShaping);
                 CheckRules(failures, where, import, expected, dropped, poseShaping);
 
-                if (Unwritable(expected) != null)
+                Check(failures, where, m.Loaded.Status == ConfigLoadStatus.Migrated, "status " + m.Loaded.Status + ", not Migrated");
+                if (m.Loaded.Status != ConfigLoadStatus.Migrated) continue;
+                // A row left to Defaults.ini holds what default gives, here the built-in value:
+                // LimitY and LimitYDown shipped at 0.15 and 0.05 and follow the schema's 0.2.
+                string migratedDifference = Difference(Expected(expected, follows), Migration.Fields(m.Loaded.Config));
+                Check(failures, where, migratedDifference == null, migratedDifference);
+                Check(failures, where, Names(m) == WobblyLifeConfigOwner.FileName + ", " + BepInExHost.Guid + ".cfg", "the folder holds " + Names(m));
+                foreach (DroppedValue d in dropped)
                 {
-                    // A hotkey the published build read as a KeyCode with no name: no codec
-                    // writes it and no approved rule covers it, so the owner defers the import and
-                    // the session runs on what it read.
-                    Check(failures, where, m.Loaded.Status == ConfigLoadStatus.Deferred, "status " + m.Loaded.Status + ", not Deferred");
-                    Check(failures, where, m.Loaded.Reason.Contains("cannot be converted"), "reason: " + m.Loaded.Reason);
-                    Check(failures, where, Names(m) == BepInExHost.Guid + ".cfg", "the folder holds " + Names(m));
-                    Check(failures, where, Difference(Expected(expected, follows), Migration.Fields(m.Loaded.Config)) == null, "the deferred session does not run on the import");
-                    deferred++;
+                    string line = m.LegacyPath + ": " + d.Describe();
+                    Check(failures, where, m.Loaded.Log.Contains(line), "the log does not name " + d.Describe());
                 }
-                else
-                {
-                    Check(failures, where, m.Loaded.Status == ConfigLoadStatus.Migrated, "status " + m.Loaded.Status + ", not Migrated");
-                    if (m.Loaded.Status != ConfigLoadStatus.Migrated) continue;
-                    // A row left to Defaults.ini holds what default gives, here the built-in value:
-                    // LimitY and LimitYDown shipped at 0.15 and 0.05 and follow the schema's 0.2.
-                    string migratedDifference = Difference(Expected(expected, follows), Migration.Fields(m.Loaded.Config));
-                    Check(failures, where, migratedDifference == null, migratedDifference);
-                    Check(failures, where, Names(m) == WobblyLifeConfigOwner.FileName + ", " + BepInExHost.Guid + ".cfg", "the folder holds " + Names(m));
-                    foreach (DroppedValue d in dropped)
-                    {
-                        string line = m.LegacyPath + ": " + d.Describe();
-                        Check(failures, where, m.Loaded.Log.Contains(line), "the log does not name " + d.Describe());
-                    }
-                    string lint = Lint(File.ReadAllBytes(m.ConfigPath));
-                    Check(failures, where, lint == null, "the migrated file " + lint);
-                    SecondLoad(failures, where, m);
-                    migrated++;
-                }
+                string lint = Lint(File.ReadAllBytes(m.ConfigPath));
+                Check(failures, where, lint == null, "the migrated file " + lint);
+                SecondLoad(failures, where, m);
+                migrated++;
                 LegacyKept(failures, where, m, input.Value);
             }
 
             Assert.True(failures.Count == 0, string.Join("\n", failures.Take(40).ToArray()));
             Assert.True(migrated > 500, migrated + " inputs migrated");
             Assert.True(created == 1, created + " inputs were a first start");
-            Assert.True(refused + deferred < migrated / 5, refused + " refused by BepInEx and " + deferred + " deferred, of " + migrated);
+            Assert.True(refused < migrated / 5, refused + " refused by BepInEx, of " + migrated);
         }
 
         /// <summary>
@@ -312,6 +299,30 @@ namespace WobblyLifeHeadTracking.Tests.ConfigDifferential
         }
 
         /// <summary>
+        /// N1: a key code Unity names no key for, which BepInEx reads into the enum from a number
+        /// in the .cfg, imports as unbound, logged as KeyCodeOutOfRange, and the player keeps the
+        /// Ctrl+Shift chord ChordHotkeys polled beside it.
+        /// </summary>
+        [Fact]
+        public void AKeyCodeUnityNamesNoKeyForUnbindsAndKeepsTheChord()
+        {
+            byte[] edited = Edit(Corpus.FirstRun("dev"), LegacyConfigReader.Controls, "ToggleKey", "10");
+            var dropped = new List<DroppedValue>();
+            LegacyFollowsDefaultsIni follows = MapOf(edited, dropped);
+            Assert.DoesNotContain(ConfigConcepts.ToggleKey, follows.Concepts);
+            DroppedValue unnamed = dropped.Single(d => d.Rule == DropRule.KeyCodeOutOfRange);
+            Assert.Equal(LegacyConfigReader.Controls, unnamed.Section);
+            Assert.Equal("ToggleKey", unnamed.Key);
+            Assert.Equal("10", unnamed.Value);
+
+            Migration m = Migration.Run(Path.Combine(scratch, "unnamed"), edited, defaults);
+            Assert.Equal(ConfigLoadStatus.Migrated, m.Loaded.Status);
+            Assert.Equal("Ctrl+Shift+Y", m.Loaded.Config.ToggleKeyName);
+            Assert.Equal("Ctrl+Shift+Y", FileRows(m.ConfigPath)["[Hotkeys] ToggleKey"]);
+            Assert.Contains(m.LegacyPath + ": " + unnamed.Describe(), m.Loaded.Log);
+        }
+
+        /// <summary>
         /// A sensitivity is no setting: one the player changed is dropped and logged, and the
         /// migrated file is the committed one.
         /// </summary>
@@ -489,9 +500,10 @@ namespace WobblyLifeHeadTracking.Tests.ConfigDifferential
                 string bindings = Migration.Polled(action.Value);
                 if (bindings == null) continue;
                 string published = import.Hotkeys[action.Key];
-                if (IsModifier(legacyKeys[action.Key].Value))
+                if (IsModifier(legacyKeys[action.Key].Value) || HasNoName(legacyKeys[action.Key].Value))
                 {
-                    // N3: the modifier alone is unbound, the chord kept.
+                    // N3 and N1: a modifier alone, or a code Unity names no key for, is unbound,
+                    // the chord kept.
                     published = published.Substring(published.IndexOf(", ", StringComparison.Ordinal) + 2);
                 }
                 Check(failures, where, bindings == published, action.Key + " polls " + bindings + ", the published build " + import.Hotkeys[action.Key]);
@@ -518,6 +530,7 @@ namespace WobblyLifeHeadTracking.Tests.ConfigDifferential
             foreach (KeyValuePair<string, KeyCode> hotkey in legacyKeys.Values)
             {
                 if (IsModifier(hotkey.Value)) expectedDropped.Add("ModifierKey [" + LegacyConfigReader.Controls + "] " + hotkey.Key);
+                if (HasNoName(hotkey.Value)) expectedDropped.Add("KeyCodeOutOfRange [" + LegacyConfigReader.Controls + "] " + hotkey.Key);
             }
             var actualDropped = dropped.Select(d => d.Rule + " [" + d.Section + "] " + d.Key).ToList();
             Check(failures, where, expectedDropped.OrderBy(x => x, StringComparer.Ordinal).SequenceEqual(actualDropped.OrderBy(x => x, StringComparer.Ordinal)),
@@ -529,6 +542,11 @@ namespace WobblyLifeHeadTracking.Tests.ConfigDifferential
             return key >= KeyCode.RightShift && key <= KeyCode.LeftAlt;
         }
 
+        private static bool HasNoName(KeyCode key)
+        {
+            return key != KeyCode.None && !KeyBindings.HasName((int)key);
+        }
+
         private static object[] Shaping(string section, string key, float value, float shipped)
         {
             return new object[] { section, key, value == shipped };
@@ -537,16 +555,6 @@ namespace WobblyLifeHeadTracking.Tests.ConfigDifferential
         private static object[] Shaping(string section, string key, bool value, bool shipped)
         {
             return new object[] { section, key, value == shipped };
-        }
-
-        // The first hotkey list no codec writes, or null.
-        private static string Unwritable(WobblyLifeSettings c)
-        {
-            foreach (string list in new[] { c.ToggleKeyName, c.CycleTrackingModeKeyName, c.YawModeKeyName })
-            {
-                if (Migration.Polled(list) == null) return list;
-            }
-            return null;
         }
 
         private static bool SameFields(WobblyLifeSettings a, WobblyLifeSettings b)

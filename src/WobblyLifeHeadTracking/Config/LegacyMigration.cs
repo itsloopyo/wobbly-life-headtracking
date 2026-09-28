@@ -122,21 +122,12 @@ namespace WobblyLifeHeadTracking.Config
         /// A legacy hotkey as a key list: the key the player set, through core's N3 (a Ctrl, Shift
         /// or Alt key alone unbinds and is logged), then the Ctrl+Shift letter ChordHotkeys polled
         /// beside it. A KeyCode with no name in core's key list (a number BepInEx read into the
-        /// enum) keeps its text, which the owner cannot write, so the import is deferred rather
-        /// than the key changed.
+        /// enum) is left unbound the same way and logged as KeyCodeOutOfRange (N1).
         /// </summary>
         private static string KeyList(KeyCode primary, KeyCode chordLetter, string legacyKey, ICollection<DroppedValue> dropped)
         {
             var items = new List<string>();
-            string plain;
-            try
-            {
-                plain = LegacyNormalisations.KeyCodeToBindings((int)primary, LegacyConfigReader.Controls, legacyKey, dropped);
-            }
-            catch (ArgumentException)
-            {
-                plain = primary.ToString();
-            }
+            string plain = LegacyNormalisations.KeyCodeToBindings((int)primary, LegacyConfigReader.Controls, legacyKey, dropped);
             if (plain.Length > 0) items.Add(plain);
             items.Add(KeyBindings.Format(new[] { new KeyBinding(KeyModifiers.Ctrl | KeyModifiers.Shift, (int)chordLetter) }));
             return string.Join(", ", items.ToArray());
